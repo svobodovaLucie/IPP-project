@@ -9,9 +9,17 @@
 // print warnings to stderr
 ini_set('display_errors', 'stderr');
 
-// global variables
+// global variables (stats, xml)
 $instr_cnt = 0;
 $comments_cnt = 0;
+//$labels_cnt = 0;
+$labels_array = [];
+$loc_cnt = 0;
+$jumps_cnt = 0;
+$fwjumps_cnt = 0;
+$backjumps_cnt = 0;
+$badjumps_cnt = 0;
+
 // the xml object
 $xml = new DomDocument('1.0', 'UTF-8');
 $xml->formatOutput = true;
@@ -229,6 +237,7 @@ while ($line_str = fgets(STDIN)) {
   if (empty($line_str[0]))
     continue;
   
+  $loc_cnt++;
   // split the line by white characters
   $line = preg_split('/\s+/',$line_str);
   // remove empty elements
@@ -242,11 +251,12 @@ while ($line_str = fgets(STDIN)) {
   
   switch(strtoupper($line[0])) {
     // INSTRUCTION
+    case 'RETURN':
+      $jumps_cnt++;
     case 'CREATEFRAME';
     case 'PUSHFRAME';
     case 'POPFRAME';
-    case 'RETURN';
-    case 'BREAK':
+    case 'BREAK': // TODO is BREAK a jump?
       // check the number of operands
       if (count($line) != 1) {
         echo "INSTRUCTION - BAD\n";
@@ -268,9 +278,15 @@ while ($line_str = fgets(STDIN)) {
       break;
 
     // INSTRUCTION <label>
+    case 'LABEL':
+      //$labels_cnt++;
+      if (!in_array($line[1], $labels_array)) {
+        array_push($labels_array, $line[1]);  // syntax is checked later
+      }
     case 'CALL';
-    case 'LABEL';
     case 'JUMP':
+      if ($line[0] != 'LABEL')
+        $jumps_cnt++;
       // check the number of operands and check them
       if ((count($line) != 2) or 
           (!check_label($line[1]))) {
@@ -367,6 +383,7 @@ while ($line_str = fgets(STDIN)) {
       // INSTRUCTION <label> <symb1> <symb2>
     case 'JUMPIFEQ';
     case 'JUMPIFNEQ':
+      $jumps_cnt++;
       $type_text1 = check_symb($line[2]);
       $type_text2 = check_symb($line[3]);
       if ((count($line) != 4) or 
@@ -402,4 +419,13 @@ while ($line_str = fgets(STDIN)) {
 }
 
 echo($xml->saveXML());
+echo "LOCS: $labels_cnt\n";
+echo "COMMENTS: $comments_cnt\n";
+//echo "LABELS: $labels_cnt\n";
+print_r($labels_array);
+echo "JUMPS: $jumps_cnt\n";
+echo "FWJUMPS: $fwjumps_cnt\n";
+echo "BACKJUMPS: $backjumps_cnt\n";
+echo "BADJUMPS: $badjumps_cnt\n";
+
 ?>
