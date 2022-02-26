@@ -1,10 +1,10 @@
 <?php
-/** HEADER */
-/** HEADER */
-/** HEADER */
-/** HEADER */
-/** HEADER */
-/** HEADER */
+/* ****************** parse.php ****************** *
+ *   Principy programovacích jazyků a OOP (IPP)    *
+ *           Lucie Svobodová, xsvobo1x             *
+ *                FIT VUT v Brně                   *
+ *                  2021/2022                      *
+ * *********************************************** */
 
 // print warnings to stderr
 ini_set('display_errors', 'stderr');
@@ -12,7 +12,7 @@ ini_set('display_errors', 'stderr');
 // global variables (stats, xml)
 $instr_cnt = 0;
 $comments_cnt = 0;
-//$labels_cnt = 0;
+$labels_cnt = 0;
 $labels_array = [];
 $loc_cnt = 0;
 $jumps_cnt = 0;
@@ -50,6 +50,8 @@ function header_check() {
       break;
     else if ($line[0][0] == '#')  // line with a comment
       $comments_cnt++;
+    else if (preg_match("/^.IPPcode22#/", $line[0]) == 1) // comment after header
+      break;
     else                          // syntax error - no header
       exit(21);
   }
@@ -67,7 +69,7 @@ function header_check() {
  */
 function arg_el($line, $instruction_el, $n, $type) {
   global $xml;
-  $argn_el = $xml->createElement("arg".$n, $line[$n]);
+  $argn_el = $xml->createElement("arg".$n, htmlspecialchars($line[$n], ENT_XML1));
   $argn_el->setAttribute("type", $type);
   $instruction_el->appendChild($argn_el);
 }
@@ -80,7 +82,7 @@ function arg_el($line, $instruction_el, $n, $type) {
  *          false if it is invalid
  */
 function check_var($var) {
-  if (preg_match("/(GF|LF|TF)@[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*/", $var) == 1)
+  if (preg_match("/^(GF|LF|TF)@[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$/", $var) == 1)
     return true;
   return false;
 }
@@ -94,9 +96,12 @@ function check_var($var) {
  */
 function check_string($string) {
   // check string and convert characters problematic in XML - automatic
-  if ($string == "")
-    return "a";
-  return $string;
+  //if ($string == "")
+  //  return "";
+  //if (preg_match("/^([^ \\\\]|\\\\(0[0-3][0-2]|092|035))*$/", $string) == 1)
+  if (preg_match("/^([^ \\\\]|\\\\\d{3})*$/", $string) == 1)
+    return $string;
+  return NULL;
 
 }
 
@@ -108,15 +113,13 @@ function check_string($string) {
  *          false if it is invalid
  */
 function check_int($num) {
-  // check int validity
-  /*
-  echo "INT: $num\n";
-  if ((intval($num, 0) == 0)) {//) or preg_match("/[0][0]* /", $num) != 1) {
-    $check = preg_match("/00* /", $num);
-    echo "INT - bad or 0: $num, check = $check\n";
-      return false;
+  // TODO hexa numbers with + or -?
+  // TODO check regexes, }maybe use intval too - but it matches eg 40i etc.
+  if ((preg_match("/^[-|+]?\d\d*$/", $num) != 1) and 
+      (preg_match("/^0[xX][0-9a-fA-F]+$/", $num) != 1) and 
+      (preg_match("/^0[1-7][0-7]*$/", $num) != 1)) {
+    return false;
   }
-  */
   return true;
 }
 
@@ -129,8 +132,8 @@ function check_int($num) {
  */
 function check_bool($string) {
   if ($string != 'true' and $string != 'false')
-    return NULL;
-  return $string;
+    return false;
+  return true;
 }
 
 /**
@@ -141,8 +144,8 @@ function check_bool($string) {
  */
 function check_nil($string) {
   if ($string != 'nil')
-    return NULL;
-  return 'nil';
+    return false;
+  return true;
 }
 
 /** 
@@ -153,7 +156,7 @@ function check_nil($string) {
  *          $label if valid
  */
 function check_label($label) {
-  if (preg_match("/[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*/", $label) == 1)
+  if (preg_match("/^[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$/", $label) == 1)
     return true;
   return false;
 }
@@ -192,8 +195,14 @@ function check_symb($word_orig) {
   unset($word[0]);
   $word = implode('@', array_values($word));
 
-  if (($type == 'string') and (($string = check_string($word)) != NULL)) {
+  if (($type == 'string')) {//} and (($string = check_string($word)) != NULL)) {
+    $string = check_string($word);
+    if (is_null($string))
+      return NULL;
+    if ($string == "") // - maybe return sth like string_empty and then check in the main function and don't print the string
+      return array('string', "");
     return array('string', $string);
+
   } else if (($type == 'int') and check_int($word)) {
     return array('int', $word);
   } else if (($type == 'bool') and check_bool($word)) {
@@ -259,8 +268,8 @@ while ($line_str = fgets(STDIN)) {
     case 'BREAK': // TODO is BREAK a jump?
       // check the number of operands
       if (count($line) != 1) {
-        echo "INSTRUCTION - BAD\n";
-        exit(22);
+        echo "INSTRUCTION - BAD - $instr_cnt\n";
+        exit(23);
       }
       break;
 
@@ -271,9 +280,10 @@ while ($line_str = fgets(STDIN)) {
       if ((count($line) != 2) or 
           (!check_var($line[1]))) {
         echo "INSTRUCTION <var> - BAD - $instr_cnt\n";
-        exit(22);
+        exit(23);
       }
       // create arg1 element
+      
       arg_el($line, $instruction_el, '1', 'var');
       break;
 
@@ -291,7 +301,7 @@ while ($line_str = fgets(STDIN)) {
       if ((count($line) != 2) or 
           (!check_label($line[1]))) {
         echo "INSTRUCTION <label> - BAD - $instr_cnt\n";
-        exit(22);
+        exit(23);
       }
       // create arg1 element
       arg_el($line, $instruction_el, '1', 'label');
@@ -307,7 +317,7 @@ while ($line_str = fgets(STDIN)) {
       if ((count($line) != 2) or 
           empty($type_text)) {
           echo "INSTRUCTION <symb> - BAD - $instr_cnt\n";
-        exit(22);
+        exit(23);
       }
       $line[1] = $type_text[1];
       arg_el($line, $instruction_el,'1', $type_text[0]);
@@ -317,13 +327,14 @@ while ($line_str = fgets(STDIN)) {
     case 'MOVE';
     case 'INT2CHAR';
     case 'STRLEN';
+    case 'NOT';
     case 'TYPE':
       $type_text = check_symb($line[2]);
       if ((count($line) != 3) or 
           !check_var($line[1]) or
           empty($type_text)) {
         echo "INSTRUCTION <var> <symb> - BAD - $instr_cnt\n";
-        exit(22);
+        exit(23);
       }
       // create arg1 element
       arg_el($line, $instruction_el, '1', 'var');
@@ -338,7 +349,7 @@ while ($line_str = fgets(STDIN)) {
           !check_var($line[1]) or
           !check_type($line[2])) {
         echo "INSTRUCTION <var> <type> - BAD - $instr_cnt\n";
-        exit(22);
+        exit(23);
       }
       // create arg1 element
       arg_el($line, $instruction_el, '1', 'var');
@@ -356,7 +367,6 @@ while ($line_str = fgets(STDIN)) {
     case 'EQ';
     case 'AND';
     case 'OR';
-    case 'NOT';
     case 'STRI2INT';
     case 'CONCAT';
     case 'GETCHAR';
@@ -368,7 +378,7 @@ while ($line_str = fgets(STDIN)) {
           empty($type_text1) or
           empty($type_text2)) {
         echo "INSTRUCTION <var> <symb1> <symb2> - BAD - $instr_cnt\n";
-        exit(22);
+        exit(23);
       }
       // create arg1 element
       arg_el($line, $instruction_el, '1', 'var');
@@ -391,7 +401,7 @@ while ($line_str = fgets(STDIN)) {
           empty($type_text1) or
           empty($type_text2)) {
         echo "INSTRUCTION <label> <symb1> <symb2> - BAD - $instr_cnt\n";
-        exit(22);
+        exit(23);
       }
       // create arg1 element
       arg_el($line, $instruction_el, '1', 'label');
@@ -405,7 +415,7 @@ while ($line_str = fgets(STDIN)) {
 
     // other
     default:
-      //echo("Problem on line starting with: [".$line[0]."]\n");
+      echo("Problem on line starting with: [".$line[0]."]\n");
       exit(22);
   }
   
@@ -419,6 +429,7 @@ while ($line_str = fgets(STDIN)) {
 }
 
 echo($xml->saveXML());
+/*
 echo "LOCS: $labels_cnt\n";
 echo "COMMENTS: $comments_cnt\n";
 //echo "LABELS: $labels_cnt\n";
@@ -427,5 +438,5 @@ echo "JUMPS: $jumps_cnt\n";
 echo "FWJUMPS: $fwjumps_cnt\n";
 echo "BACKJUMPS: $backjumps_cnt\n";
 echo "BADJUMPS: $badjumps_cnt\n";
-
+*/
 ?>
