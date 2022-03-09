@@ -1,10 +1,15 @@
 <?php
 /* ****************** parse.php ****************** *
- *   Principy programovacích jazyků a OOP (IPP)    *
- *           Lucie Svobodová, xsvobo1x             *
- *                FIT VUT v Brně                   *
+ *    Principles of Programming Languages (IPP)    *
+ *           Lucie Svobodova, xsvobo1x             *
+ *          xsvobo1x@stud.fit.vutbr.cz             *
+ *                   FIT BUT                       *
  *                  2021/2022                      *
  * *********************************************** */
+/**
+ * This script parses the input file in IPPcode22 language
+ * and prints its XML representation to stdout.
+ */
 
 // print warnings to stderr
 ini_set('display_errors', 'stderr');
@@ -13,14 +18,39 @@ ini_set('display_errors', 'stderr');
  * Function prints help to stdout.
  */
 function print_help() {
-  echo "Help\n";
-  echo "And sth else\n";
+  echo "  This script parses input file in IPPcode22 programming language 
+  and prints its XML representation to stdout after the lexical and syntactic analysis.
+
+  Usage:
+  - run the programme:
+    php8.1 parse.php <input_file
+  - print help
+    php8.1 parse.php --help
+  - run the programme with statistics (described below)
+    php8.1 parse.php <input_file [options]
+
+  Run with statistics:
+  - various statistics can be saved into files
+  - use option '--stats=file' where 'file' is a file to that the stats will be written
+  - then use the statistics specifiers:
+    --loc - number of lines
+    --comments - number of comments
+    --labels - number of labels
+    --jumps - number of jumps and returns
+    --fwjumps - number of forward jumps
+    --backjumps - number of backward jumps
+    --badjumps - number of jumps to invalid labels
+  - usage example (loc and jumps will be written to file1 and comments and labels to file2):
+    php8.1 parse.php <input_file --stats=file1 --loc --jumps --stats=file2 --comments --labels
+  ";
 }
 
 /**
- * Function parses command line arguments and stores them in
- * the "$cli_args" array.
+ * Function parses command line arguments and stores them 
+ * in the "$cli_args" array.
  * In the case of invalid arguments the programme exits.
+ * 
+ * @param $argv command line arguments
  */
 function parse_cmdline($argv) {
   $args = count($argv);
@@ -32,76 +62,58 @@ function parse_cmdline($argv) {
         print_help();
         exit(0);
       }
-    default:
+    default:  // other
       break;
   }
-  // TODO check jestli neni zadan vicekrat stejny soubor (pozor, check i "file" a file)
-  // --help
-  /*
-  if ($argv[1] == "--help") {
-    if (count($argv) != 2)
-      exit(10);
-    print_help();
-    exit(0);
-  }
-  */
-
-  // Wrong arguments
-  // TODO maybe dont check for files
-  if (preg_match("/^--stats=\"?[^<>:;,?\"*|\/]+\"?$/", $argv[1]) != 1) {
+  // check if the first option is --stats=file -> if not, the cmd line arguments are invalid
+  if (preg_match("/^--stats=/", $argv[1]) != 1) {
     exit(10);
   }
-
-  /*
-    $cli_args array:
-    [0] => Array  (
-                    [0] => file1.txt
-                    [1] => loc
-                    [2] => jumps
-                  )
-    [1] => Array  (
-                    [0] => file2.txt
-                    [1] => badjumps
-                  )
-  */
+  // check the arguments and store them in $cli_args array
   global $cli_args;
   $counter_for_cli = -1;
   for ($i=1; $i < count($argv); $i++) {
     // --stats=file
-    if (preg_match("/^--stats=\"?[^<>:;,?\"*|\/]+\"?$/", $argv[$i]) == 1) {
+    if (preg_match("/^--stats=/", $argv[$i]) == 1) {
       $cli_args[++$counter_for_cli] = preg_split("/--stats=/", $argv[$i], 0, PREG_SPLIT_NO_EMPTY);
+      // check if the filename is unique
+      for ($j = 0; $j < count($cli_args) - 1; $j++) {
+        if ($cli_args[$counter_for_cli][0] == $cli_args[$j][0])
+          exit(12);
+      }
       continue;
     }
-    // other options
+    // another options
     if ($argv[$i] == "--loc" || $argv[$i] == "--comments" || $argv[$i] == "--labels" || $argv[$i] == "--jumps" 
         || $argv[$i] == "--fwjumps" || $argv[$i] == "--backjumps" || $argv[$i] == "--badjumps") {
       array_push($cli_args[$counter_for_cli], $argv[$i]);
     } else
       exit(10);
   }
-  // TODO remove debug
-  //print_r($cli_args);
 }
 
 /**
- * TODO
+ * Function saves stats to files specified in command line arguments.
+ * 
+ * @param $cli_args array that contains the command line arguments
+ * @param $stats array that contains statistics about the analyzed file
  */
 function save_stats($cli_args, $stats) {
-  //echo "saving stats\n";
   $stats_group_num = 0;
-  //var_dump($cli_args);
   while ($stats_group_num < count($cli_args)) {
-    // open file
-    $stats_file = fopen($cli_args[$stats_group_num][0],'w');
-    if ($stats_file == false)
-      exit(11);
+    // try to open the file
+      try {
+        $stats_file = fopen($cli_args[$stats_group_num][0],'w');
+        if (!$stats_file) {
+          throw new Exception('File open failed.');
+        }  
+      } catch (Exception $ex) {
+        exit(11);
+      }
 
-    // inside
+    // write to the file
     for ($i = 1; $i < count($cli_args[$stats_group_num]); $i++) {
-      //print_r($cli_args[$stats_group_num][$i]);
-      //echo "\n";
       switch ($cli_args[$stats_group_num][$i]) {
-        // write_stats();
         case '--loc':
           fwrite($stats_file, $stats['loc']."\n");
           break;
@@ -110,7 +122,6 @@ function save_stats($cli_args, $stats) {
           break;
         case '--labels':
           fwrite($stats_file, count($stats['labels_defined'])."\n");
-          //echo "LABELS: ".count($stats['labels_defined'])."\n";
           break;
         case '--jumps':
           fwrite($stats_file, $stats['jumps']."\n");
@@ -123,67 +134,16 @@ function save_stats($cli_args, $stats) {
           break;
         case '--badjumps':
           $badjumps_cnt = 0;
-          foreach ($jump as $stats['labels_undefined']) {
+          foreach ($stats['labels_undefined'] as $jump) {
             $badjumps_cnt += $jump;
           }
           fwrite($stats_file, $badjumps_cnt);
-          //echo "BADJUMPS: ".$badjumps_cnt."\n";
           break;
       }
     }
-    
-    // close file
     fclose($stats_file);
-    //echo "ONE DONE\n";
     $stats_group_num++;
   }
-
-  /*
-echo "LOCS: ".$stats['loc']."\n";
-echo "COMMENTS: ". $stats['comments']."\n";
-$labels_cnt = count($stats['labels_defined']);
-//echo "LABELS: ".$stats['labels']."\n";
-// z pole undefined zjistime nasledujici:
-// to, co v nem zbylo, je pocet badjumps
-print_r($stats['labels_undefined']);
-print_r($stats['labels_defined']);
-echo "JUMPS: ".$stats['jumps']."\n";
-echo "FWJUMPS: ".$stats['fwjumps']."\n";
-echo "BACKJUMPS: ".$stats['backjumps']."\n";
-//echo "BADJUMPS: ".$stats['badjumps']."\n";
-*/
-}
-
-// global variables (stats, xml)
-// TODO dat do struktury
-$stats = array("instr"=> 0, "loc"=> 0, "comments"=> 0, "jumps"=> 0, "fwjumps"=> 0,
-                "backjumps"=> 0, "labels_defined"=> [], "labels_undefined"=> []);
-
-$cli_args = [];
-//$instr_cnt = 0;//
-//$comments_cnt = 0;//
-//$labels_cnt = 0;//
-//$labels_defined = [];//
-//$labels_undefined = [];//
-//$loc_cnt = 0;//
-//$jumps_cnt = 0;//
-//$fwjumps_cnt = 0;
-//$backjumps_cnt = 0;
-//$badjumps_cnt = 0;
-
-// the xml object
-$xml = new DomDocument('1.0', 'UTF-8');
-$xml->formatOutput = true;
-
-/** TODO
- * Function parses command line arguments.
- * 
- * @return  true if succesful,
- *          false if not
- */
-function parse_cmd() {
-  printf("TODO\n");
-  return true;
 }
 
 /**
@@ -211,7 +171,6 @@ function header_check() {
     if ($line[0] == '.IPPcode22') // the header
       break;
     else if ($line[0][0] == '#')  // line with a comment
-      //$comments_cnt++;
       $stats['comments']++;
     else if (preg_match("/^.IPPcode22#/", $line[0]) == 1) // comment after header
       break;
@@ -220,7 +179,6 @@ function header_check() {
   }
 }
 
-// adds the nth argument
 /**
  * Function inserts new arg element into $xml.
  * 
@@ -272,8 +230,6 @@ function check_string($string) {
  *          false if it is invalid
  */
 function check_int($num) {
-  // TODO hexa numbers with + or -?
-  // TODO check regexes, }maybe use intval too - but it matches eg 40i etc.
   if ((preg_match("/^[-|+]?\d\d*$/", $num) != 1) and 
       (preg_match("/^0[xX][0-9a-fA-F]+$/", $num) != 1) and 
       (preg_match("/^0[1-7][0-7]*$/", $num) != 1)) {
@@ -308,7 +264,7 @@ function check_nil($string) {
 }
 
 /** 
- * Function checks if the name of a label is valid.
+ * Function checks if the name of a label is valid and counts the statistics.
  * 
  * @param $label the name to be checked
  * @return  NULL if invalid,
@@ -317,63 +273,33 @@ function check_nil($string) {
 function check_label($label, $instr) {
   if (!preg_match("/^[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$/", $label) == 1)
     return false;
-  global $stats;
-  /*
-  global $labels_defined;
-  global $labels_undefined;
-  global $fwjumps_cnt;
-  global $jumps_cnt;
-  */
 
+  global $stats;
   if ($instr == 'LABEL') {
-    //$labels_cnt++;  // TODO remove from main switch
-    //if (!in_array($label, $labels_defined)) {
     if (!in_array($label, $stats['labels_defined'])) {
-      // if v array undefined - prepise se do defined a pocet, co byl v undefined u daneho klice se da do fwdjumps
-      //print_r($labels_undefined);
-      //if (array_key_exists($label, $labels_undefined)) {
       if (array_key_exists($label, $stats['labels_undefined'])) {
-        //$fwjumps_cnt += $labels_undefined[$label];
+        // remove from the labels_undefined array
         $stats['fwjumps'] += $stats['labels_undefined'][$label];
-        // delete from undefined array
-        //unset($labels_undefined[$label]);
         unset($stats['labels_undefined'][$label]);
       }
-      //array_push($labels_defined, $label);
+      // add to the labels_defined array
       array_push($stats['labels_defined'], $label);
-    } // else redefinice - neresime?
+    }
 
   } else { // eg JUMP, JUMPIFEQ...
-    //$jumps_cnt++;
     $stats['jumps']++;
-    
-    // is the label defined yet? -> if yes then backjump
-    
-    //if (in_array($label, $labels_defined)) {
+    // is the label defined yet -> backjump
     if (in_array($label, $stats['labels_defined'])) {
-      //$backjumps_cnt++;
       $stats['backjumps']++;
-      // vyresit neco, abychom vedeli, co u return atd.
-
       return true;
-    
-    } // else
-
-    // not defined yet - forward or bad jump
+    }
     if (array_key_exists($label, $stats['labels_undefined'])) {
-      //$labels_undefined[$label] += 1;
       $stats['labels_undefined'][$label] += 1;
     } else {
-      // label not defined yet
-      //$labels_undefined += array($label=>1);
+      // label is not defined yet -> add to labels_undefined array
       $stats['labels_undefined'] += array($label=>1);
     }
   }
-  // TODO remove
-  //echo "LABELS DEFINED\n";
-  //print_r($stats['labels_defined']);
-  //echo "LABELS UNDEFINED\n";
-  //print_r($stats['labels_undefined']);
   return true;
 }
 
@@ -411,11 +337,11 @@ function check_symb($word_orig) {
   unset($word[0]);
   $word = implode('@', array_values($word));
 
-  if (($type == 'string')) {//} and (($string = check_string($word)) != NULL)) {
+  if (($type == 'string')) {
     $string = check_string($word);
     if (is_null($string))
       return NULL;
-    if ($string == "") // - maybe return sth like string_empty and then check in the main function and don't print the string
+    if ($string == "")
       return array('string', "");
     return array('string', $string);
 
@@ -436,26 +362,35 @@ function check_symb($word_orig) {
  * The main body.
  */
 
-// parse the command line arguments
-parse_cmdline($argv);
-//echo "PARSE OK\n";
+/* Array used for storing information about statistics. */
+$stats = array("instr"=> 0, "loc"=> 0, "comments"=> 0, "jumps"=> 0, "fwjumps"=> 0,
+                "backjumps"=> 0, "labels_defined"=> [], "labels_undefined"=> []);
 
-// create program element
+/* Array used for storing the parsed command line options. */
+$cli_args = [];
+
+/* The XML object. */
+$xml = new DomDocument('1.0', 'UTF-8');
+$xml->formatOutput = true;
+
+// create a program element
 $program_el = $xml->createElement("program");
 $program_el->setAttribute("language", "IPPcode22");
 $xml->appendChild($program_el);
 
-// check the header
+// parse the command line arguments
+parse_cmdline($argv);
+
+// check if the ".IPPcode22" header is present
 header_check();
 
 // the main loop that checks the syntax of the input
 while ($line_str = fgets(STDIN)) {
-  // remove the '\n'
+  // remove '\n'
   $line_str = trim($line_str, "\n");
 
   // remove comments
   if (str_contains("$line_str", '#')) {
-    //$comments_cnt++;
     $stats['comments']++;
     $line_str = explode('#', $line_str);
     $line_str = $line_str[0];
@@ -468,29 +403,28 @@ while ($line_str = fgets(STDIN)) {
   if (empty($line_str[0]))
     continue;
   
-  //$loc_cnt++;
   $stats['loc']++;
   // split the line by white characters
   $line = preg_split('/\s+/',$line_str);
   // remove empty elements
   $line = array_values(array_filter($line, "is_var_empty"));
 
+  $line[0] = strtoupper($line[0]);
+
   // create an instruction element
   $instruction_el = $xml->createElement("instruction");
-  //$instruction_el->setAttribute("order", ++$instr_cnt);
   $instruction_el->setAttribute("order", ++$stats['instr']);
-  $instruction_el->setAttribute("opcode", strtoupper($line[0]));
+  $instruction_el->setAttribute("opcode", $line[0]);
   $program_el->appendChild($instruction_el);
   
-  switch(strtoupper($line[0])) {
+  switch($line[0]) {
     // INSTRUCTION
     case 'RETURN':
-      //$jumps_cnt++;
       $stats['jumps']++;
     case 'CREATEFRAME';
     case 'PUSHFRAME';
     case 'POPFRAME';
-    case 'BREAK': // TODO is BREAK a jump?
+    case 'BREAK':
       // check the number of operands
       if (count($line) != 1) {
         echo "INSTRUCTION - BAD - $stats[0]\n";
@@ -508,21 +442,13 @@ while ($line_str = fgets(STDIN)) {
         exit(23);
       }
       // create arg1 element
-      
       arg_el($line, $instruction_el, '1', 'var');
       break;
 
     // INSTRUCTION <label>
     case 'LABEL':
-      /*
-      if (!in_array($line[1], $labels_array)) {
-        array_push($labels_defined, $line[1]);  // syntax is checked later
-      }
-      */
     case 'CALL';
     case 'JUMP':
-      //if ($line[0] != 'LABEL')
-        //$jumps_cnt++;
       // check the number of operands and check them
       if ((count($line) != 2) or 
           (!check_label($line[1], $line[0]))) {
@@ -545,6 +471,7 @@ while ($line_str = fgets(STDIN)) {
           echo "INSTRUCTION <symb> - BAD - $stats[0]\n";
         exit(23);
       }
+      // create arg1 element
       $line[1] = $type_text[1];
       arg_el($line, $instruction_el,'1', $type_text[0]);
       break;
@@ -562,9 +489,8 @@ while ($line_str = fgets(STDIN)) {
         echo "INSTRUCTION <var> <symb> - BAD - $stats[0]\n";
         exit(23);
       }
-      // create arg1 element
+      // create arg1 and arg2 elements
       arg_el($line, $instruction_el, '1', 'var');
-      // create arg2 element
       $line[2] = $type_text[1];
       arg_el($line, $instruction_el, '2', $type_text[0]);
       break;
@@ -577,9 +503,8 @@ while ($line_str = fgets(STDIN)) {
         echo "INSTRUCTION <var> <type> - BAD - $stats[0]\n";
         exit(23);
       }
-      // create arg1 element
+      // create arg1 and arg2 elements
       arg_el($line, $instruction_el, '1', 'var');
-      // create arg2 element
       arg_el($line, $instruction_el, '2', 'type');
       break;
 
@@ -606,12 +531,10 @@ while ($line_str = fgets(STDIN)) {
         echo "INSTRUCTION <var> <symb1> <symb2> - BAD - $stats[0]\n";
         exit(23);
       }
-      // create arg1 element
+      // create arg1, arg2 and arg3 elements
       arg_el($line, $instruction_el, '1', 'var');
-      // create arg2 element
       $line[2] = $type_text1[1];
       arg_el($line, $instruction_el, '2', $type_text1[0]);
-      // create arg3 element
       $line[3] = $type_text2[1];
       arg_el($line, $instruction_el, '3', $type_text2[0]);
       break;
@@ -619,7 +542,6 @@ while ($line_str = fgets(STDIN)) {
       // INSTRUCTION <label> <symb1> <symb2>
     case 'JUMPIFEQ';
     case 'JUMPIFNEQ':
-      //$jumps_cnt++;
       $type_text1 = check_symb($line[2]);
       $type_text2 = check_symb($line[3]);
       if ((count($line) != 4) or 
@@ -629,35 +551,32 @@ while ($line_str = fgets(STDIN)) {
         echo "INSTRUCTION <label> <symb1> <symb2> - BAD - $stats[0]\n";
         exit(23);
       }
-      // create arg1 element
+      // create arg1, arg2 and arg3 elements
       arg_el($line, $instruction_el, '1', 'label');
-      // create arg2 element
       $line[2] = $type_text1[1];
       arg_el($line, $instruction_el, '2', $type_text1[0]);
-      // create arg3 element
       $line[3] = $type_text2[1];
       arg_el($line, $instruction_el, '3', $type_text2[0]);
       break;
 
-    // other
+    // wrong instruction
     default:
-      echo("Problem on line starting with: [".$line[0]."]\n");
+      echo("Problem on line starting with instruction: ".$line[0]."\n");
       exit(22);
   }
-  
   // check comments (for stats)
   foreach ($line as $v) {
     if (str_contains("$v", '#')) {
-      //$comments_cnt++;
       $stats['comments']++;
       break;
     }
   }
 }
 
-echo($xml->saveXML());
-
+// save statistics
 if (count($argv) != 1)
   save_stats($cli_args, $stats);
-//echo "stats saved\n";
+
+// print XML to stdout
+echo($xml->saveXML());
 ?>
