@@ -15,12 +15,10 @@ class Program:
   instr_dict: {}
   """
   def __init__(self):
-    #print("Program init\n")
     self._instr_dict = {}
     self._lf: Frame = None
     self._tf: Frame = None
     self._gf = Frame()
-    #self._gf.set_empty_frame()  # initialise frame
     self._lf_stack = []
     self._call_stack = []
     self._instr_counter = 0 # ma v sobe order, ne index pole!!!
@@ -45,7 +43,7 @@ class Program:
     return self._instr_counter
   
   def call_stack_push(self, order):
-    self._call_stack.push(order)
+    self._call_stack.append(order)
 
   def call_stack_pop(self):
     try:
@@ -103,7 +101,6 @@ class Program:
     self.get_frame(name).set_var_value(name, value, typ)
 
   def set_tf_frame(self):
-    #self._tf.set_empty_frame()
     self._tf = Frame()
   
   def push_frame(self):
@@ -298,14 +295,7 @@ class Pushframe(Instruction):
 
   def execute(self):
     print('Executing pushframe.')
-    #TF -> LF, LF na stack, TF oddefinovat (unset)
     prog.push_frame()
-    print("GF dict:")
-    print(prog.get_frame_dict('GF'))
-    print("LF dict:")
-    print(prog.get_frame_dict('LF'))
-    print("TF dict:")
-    print(prog.get_frame_dict('TF'))
 
 class Popframe(Instruction):
   def __init__(self):
@@ -314,12 +304,6 @@ class Popframe(Instruction):
   def execute(self):
     print('Executing popframe.')
     prog.pop_frame()
-    print("GF dict:")
-    print(prog.get_frame_dict('GF'))
-    print("LF dict:")
-    print(prog.get_frame_dict('LF'))
-    print("TF dict:")
-    print(prog.get_frame_dict('TF'))
 
 # class for the DEFVAR instruction
 class Defvar(Instruction):
@@ -331,12 +315,6 @@ class Defvar(Instruction):
     print('Executing defvar.')
     # inserts new variable with None value in the frame
     prog.set_var(self.get_arg1_value_type())
-    print("GF dict:")
-    print(prog.get_frame_dict('GF'))
-    print("LF dict:")
-    print(prog.get_frame_dict('LF'))
-    print("TF dict:")
-    print(prog.get_frame_dict('TF'))
     
 # class for the CALL instruction
 class Call(Instruction):
@@ -346,6 +324,11 @@ class Call(Instruction):
 
   def execute(self):
     print('Executing call.')
+    # save the current position
+    prog.call_stack_push(prog.get_instr_counter())
+    # jump to the label
+    prog.set_instr_counter(prog.get_label_order(self._arg1.get_value()))
+
 
 class Return(Instruction):
   def __init__(self):
@@ -353,6 +336,8 @@ class Return(Instruction):
 
   def execute(self):
     print('Executing return.')
+    pos = prog.call_stack_pop()
+    prog.set_instr_counter(pos)
 
 class Pushs(Instruction):
   def __init__(self):
@@ -441,6 +426,7 @@ class Jump(Instruction):
 
   def execute(self):
     # zmena rizeni toku programu
+    print('Executing jump.')
     prog.set_instr_counter(prog.get_label_order(self._arg1.get_value()))
 
 class Factory:
@@ -537,9 +523,6 @@ def parse_arguments():
       print("File " + args['source'][0][0] + " does not exist.")
       exit(11)
 
-  #print(input_file.read())
-  #print(source_file.read())
-
   return source_file, input_file
 
 # xml load
@@ -548,8 +531,6 @@ def xml_load(source_file):
   tree.parse(source_file)
 
   root = tree.getroot()
-
-  #prog = Program()
 
   # add right instruction (order : opcode)
   for child in root:
@@ -560,38 +541,29 @@ def xml_load(source_file):
     instr = Factory.resolve(child.attrib['opcode'], child)
     if (instr == -1):
       continue
-    #print(child.attrib['order'], child.attrib['opcode'])
 
-    #prog.add_instr(child.attrib['order'], instr.get_opcode())
     prog.add_instr(child.attrib['order'], instr)
-
-
-  #print(prog.get_instr_dict())
-
-  #print("Sort:")
 
   prog.sort()
 
-  #print(prog.get_instr_dict())
-
   # DRUHA SECOND CAST PROGRAMU
-
-  #i = 1
-  #prochazeni neni do len, ale podle order
-  # TODO sekvence nemusi byt souvisla
-  # TODO vyresit skoky
   order_list = list(prog.get_instr_dict().keys())
   index = 0
+
   while index < len(order_list):
+    print(order_list[index])
+    # set instruction counter to the order on current index
     prog.set_instr_counter(order_list[index])
-    # if JUMP then prog.set_instr_counter('25') else index++
+
+    # execute the instruction
     ins = prog.get_instr_dict()[order_list[index]]
     ins.execute()
 
-    # detekce zmeny behu programu
+    # detect if the program flow changed -> change the index
     if prog.get_instr_counter() != order_list[index]:
       index = order_list.index(prog.get_instr_counter())
-      
+    
+    # increment the program counter
     index += 1
 
 # xml check
