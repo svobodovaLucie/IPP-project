@@ -2,6 +2,7 @@ import argparse
 #from posixpath import supports_unicode_filenames
 import sys
 import os
+from traceback import print_tb
 from xml.etree.ElementTree import ElementTree
 
 class Program:
@@ -14,13 +15,31 @@ class Program:
   instr_dict: {}
   """
   def __init__(self):
-    print("Program init\n")
+    #print("Program init\n")
     self._instr_dict = {}
-    self._lf = Frame()
-    self._tf = Frame()
+    self._lf: Frame = None
+    self._tf: Frame = None
     self._gf = Frame()
-    self._gf.set_frame()  # initialise frame
-    self._lf_list = []
+    #self._gf.set_empty_frame()  # initialise frame
+    self._lf_stack = []
+    self._call_stack = []
+    self._instr_counter = 0 # ma v sobe order, ne index pole!!!
+    
+  def set_instr_counter(self, order):
+    self._instr_counter = order
+
+  def get_instr_counter(self):
+    return self._instr_counter
+  
+  def call_stack_push(self, order):
+    self._call_stack.push(order)
+
+  def call_stack_pop(self):
+    try:
+      return self._call_stack.pop()
+    except IndexError:
+      sys.stderr.write('Call stack is empty.\n')
+      exit(56)
 
   def add_instr(self, order, instr):
     self._instr_dict[order] = instr
@@ -36,19 +55,29 @@ class Program:
     if frame_name[0:2] == 'GF':
       return self._gf
     elif frame_name[0:2] == 'LF':
-      if not self._lf.is_initialised():
+      if self._lf == None:
         sys.stderr.write('Uninitialised local frame.\n')
         exit(55)
+      print("LF dict: ")
+      print(self._lf.get_frame_dict())
       return self._lf
     elif frame_name[0:2] == 'TF':
-      if not self._tf.is_initialised():
+      if self._tf == None:
         sys.stderr.write('Uninitialised temporary frame.\n')
         exit(55)
+      print("TF dict: ")
+      print(self._tf.get_frame_dict())
       return self._tf
     else:
       exit(-1)  # TODO nemelo by nastat ale
 
   def get_frame_dict(self, frame_name):
+    # TODO remove - just for debug
+    if frame_name[0:2] == 'TF' and self._tf == None:
+      return {}
+    if frame_name[0:2] == 'LF' and self._lf == None:
+      return {}
+    # TODO don't remove
     return self.get_frame(frame_name).get_frame_dict()
 
   def set_var(self, name_type):
@@ -60,25 +89,41 @@ class Program:
     value, typ = (value_type)
     self.get_frame(name).set_var_value(name, value, typ)
 
+  def set_tf_frame(self):
+    #self._tf.set_empty_frame()
+    self._tf = Frame()
   
+  def push_frame(self):
+    # check if the TF is initialised
+    if self._tf == None:
+      sys.stderr.write('Uninitialised temporary frame.\n')
+      exit(55)
+    # pass the TF reference to LF
+    self._lf = self._tf
+    self._tf = None
+    # push the LF to the stack
+    self._lf_stack.append(self._lf)
+
+  def pop_frame(self):
+    # LF -> TF, pokud LF stack empty chyba 55
+    # check if the lf_stack is not empty
+    if not self._lf_stack:
+      sys.stderr.write('LF stack is empty.\n')
+      exit(55)
+    self._tf = self._lf_stack.pop()
+    if self._lf_stack:
+      self._lf = self._lf_stack[-1] # top
+    else:
+      self._lf = None
+    
+
 
 class Frame:
-  # attributes
-  """
-  
-  """
   def __init__(self):
-    print("Frame init\n")
+    #print("Frame init\n")
     self._frame_dict = {}
-    self._initialised = False
-
-  def set_frame(self):
-    self._initialised = True
 
   def set_var(self, name, typ):
-    if self._initialised == False:
-      sys.stderr.write('Frame does not exist.\n')
-      exit(55)
     # slouzi pro DEFVAR - hodnotu jeste nezname
     # osetrit, zda tam jeste 'name' neni
     name = name[3:]
@@ -102,7 +147,8 @@ class Frame:
     
     #TODO podle typu priradit hodnotu
     if valtype == 'var':
-      self._frame_dict[name] = self.get_var_value(value[3:]) #self._frame_dict[value[3:]]
+      self._frame_dict[name] = prog.get_frame(value).get_var_value(value[3:])
+      #self._frame_dict[name] = self.get_var_value(value[3:]) #self._frame_dict[value[3:]]
       # kktina, potrebuju ziskat hodnotu dane promenne ze slovniku
       
     else:
@@ -119,16 +165,13 @@ class Frame:
   def get_frame_dict(self):
     return self._frame_dict
 
-  def is_initialised(self):
-    return self._initialised
-
 class Argument:
 
   def __init__(self, value, typ):
     # self._typ = typ
     self._value = value
     self._typ = typ
-    print("Argument init")
+    #print("Argument init")
 
   def set_value(self, arg1):
     self._value = arg1
@@ -203,6 +246,8 @@ class Instruction:
     return self._arg3.get_type()
 
 
+
+
 class Move(Instruction):
 
   def __init__(self, arg1v, arg1t, arg2v, arg2t):
@@ -213,13 +258,55 @@ class Move(Instruction):
     #self.set_arg2(arg2v, arg2t)
 
   def execute(self):
-    print("Jsem move s argumentem ")
-    print(self.get_arg1_value())
-    print(self.get_arg2_value())
-    #prog.get_frame('GF').set_var_value(self._arg1.get_value(), self._arg2.get_value())
-    #TODO check: 
+    print('Executing move.')
     prog.set_var_value(self.get_arg1_value(), self.get_arg2_value_type())
     print(prog.get_frame_dict('GF'))
+    print(prog.get_frame_dict('LF'))
+
+    
+class Createframe(Instruction):
+  def __init__(self):
+    super().__init__("CREATEFRAME")
+
+  def execute(self):
+    #vytvori novy TF a zahodi obsah puvodniho TF
+    print('Executing createframe.')
+    prog.set_tf_frame()
+    print("GF dict:")
+    print(prog.get_frame_dict('GF'))
+    print("LF dict:")
+    print(prog.get_frame_dict('LF'))
+    print("TF dict:")
+    print(prog.get_frame_dict('TF'))
+
+class Pushframe(Instruction):
+  def __init__(self):
+    super().__init__("PUSHFRAME")
+
+  def execute(self):
+    print('Executing pushframe.')
+    #TF -> LF, LF na stack, TF oddefinovat (unset)
+    prog.push_frame()
+    print("GF dict:")
+    print(prog.get_frame_dict('GF'))
+    print("LF dict:")
+    print(prog.get_frame_dict('LF'))
+    print("TF dict:")
+    print(prog.get_frame_dict('TF'))
+
+class Popframe(Instruction):
+  def __init__(self):
+    super().__init__("POPFRAME")
+
+  def execute(self):
+    print('Executing popframe.')
+    prog.pop_frame()
+    print("GF dict:")
+    print(prog.get_frame_dict('GF'))
+    print("LF dict:")
+    print(prog.get_frame_dict('LF'))
+    print("TF dict:")
+    print(prog.get_frame_dict('TF'))
 
 # class for the DEFVAR instruction
 class Defvar(Instruction):
@@ -228,30 +315,129 @@ class Defvar(Instruction):
     self.set_arg1(arg1v, arg1t)
 
   def execute(self):
+    print('Executing defvar.')
     # inserts new variable with None value in the frame
-    """if self.get_arg1_type() != 'var':
-      sys.stderr.write('Invalid DEFVAR operand type.\n')
-      exit(-1)"""
     prog.set_var(self.get_arg1_value_type())
-    print("Prog GF:")
+    print("GF dict:")
     print(prog.get_frame_dict('GF'))
+    print("LF dict:")
+    print(prog.get_frame_dict('LF'))
+    print("TF dict:")
+    print(prog.get_frame_dict('TF'))
     
+# class for the CALL instruction
+class Call(Instruction):
+  def __init__(self, arg1v, arg1t):
+    super().__init__("CALL")
+    self.set_arg1(arg1v, arg1t)
+
+  def execute(self):
+    print('Executing call.')
+
+class Return(Instruction):
+  def __init__(self):
+    super().__init__("RETURN")
+
+  def execute(self):
+    print('Executing return.')
+
+class Pushs(Instruction):
+  def __init__(self):
+    super().__init__("PUSHS")
+
+  def execute(self):
+    print('Executing pushs.')
+
+class Pops(Instruction):
+  def __init__(self):
+    super().__init__("POPS")
+
+  def execute(self):
+    print('Executing pops.')
+
+# TODO arithmetic instructions
+
+class Read(Instruction):
+
+  def __init__(self, arg1v, arg1t, arg2v, arg2t):
+    super().__init__("READ")
+    self.set_args2(arg1v, arg1t, arg2v, arg2t)
+
+  def execute(self):
+    print('Executing read.')
+    if input_file == '<stdin>':
+      try:
+        inp = input()
+      except ValueError:
+        inp = None
+    else:
+      try:
+        f = open(input_file, "r")
+      except FileNotFoundError:
+        sys.stderr.write('File ' + input_file + 'not found.\n')
+        exit(11)
+      inp = f.readline()
+
+    try:
+      #inp = input_file.readline()
+      if self.get_arg2_value() == 'int':
+        inp = int(inp)
+      elif self.get_arg1_value() == 'string':
+        inp = str(inp)
+      elif self.get_arg1_value() == 'bool':
+        if inp.upper() == 'TRUE':
+          inp = 'true'
+        else:
+          inp = 'false'
+    except ValueError:
+      inp = None
+
+class Write(Instruction):
+  def __init__(self, arg1v, arg1t):
+    super().__init__("WRITE")
+    self.set_arg1(arg1v, arg1t)
+
+  def execute(self):
+    print('Executing write.')
+    if self.get_arg1_type() == 'nil':
+      print('', end='')
+    elif self.get_arg1_type() == 'bool':
+      if self.get_arg1_value().upper() == 'TRUE':
+        print('true', end='')
+      else:
+        print('false', end='')
+    else:
+      print(self.get_arg1_value(), end='')
+    # TODO remove
+    print('')
+
 
 class Factory:
   @classmethod
-  def resolve(cls, string: str, root):
-    if string.upper() == "DEFVAR":
-      #arg1 = Argument(root[0].text)
-      #print('LEN OF ROOT: ' + str(len(root)))
-      #arg1.set_value(root[0].text)
-      #return Defvar(arg1) # TODO here arg1 by byl proste text a argument() by se vytvoril az v konstruktoru Defvar
-      return Defvar(root[0].text, root[0].attrib['type'])
-    elif string.upper() == "MOVE":
-      #arg1 = Argument(root[0].text)
-      #arg1.set_value(root[0].text)
-      #arg2 = Argument(root[1].text)
-      #arg2.set_value(root[1].text)
+  def resolve(cls, opcode: str, root):
+    opcode = opcode.upper()
+    if opcode == 'MOVE':
       return Move(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'])
+    elif opcode == 'CREATEFRAME':
+      return Createframe()
+    elif opcode == 'PUSHFRAME':
+      return Pushframe()
+    elif opcode == 'POPFRAME':
+      return Popframe()
+    elif opcode == 'DEFVAR':
+      return Defvar(root[0].text, root[0].attrib['type'])
+    elif opcode == 'CALL':
+      return Call(root[0].text, root[0].attrib['type'])
+    elif opcode == 'RETURN':
+      return Return()
+    elif opcode == 'PUSHS':
+      return Pushs(root[0].text, root[0].attrib['type'])
+    elif opcode == 'POPS':
+      return Pops(root[0].text, root[0].attrib['type'])
+    if opcode == 'READ':
+      return Read(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'])
+    elif opcode == 'WRITE':
+      return Write(root[0].text, root[0].attrib['type'])
     else:
       sys.stderr.write('Invalid opcode (more like not implemented yet).\n')
       #exit(52)
@@ -322,12 +508,10 @@ def parse_arguments():
 
 # xml load
 def xml_load(source_file):
-  print(source_file)
   tree = ElementTree()
   tree.parse(source_file)
 
   root = tree.getroot()
-  print(root.tag)
 
   #prog = Program()
 
@@ -337,37 +521,68 @@ def xml_load(source_file):
       sys.stderr.write('Chybicka se vloudila do vstupniho XML\n')
       exit(32) # mozna 31, idk
 
-
     instr = Factory.resolve(child.attrib['opcode'], child)
     if (instr == -1):
       continue
-    print(child.attrib['order'], child.attrib['opcode'])
+    #print(child.attrib['order'], child.attrib['opcode'])
 
     #prog.add_instr(child.attrib['order'], instr.get_opcode())
     prog.add_instr(child.attrib['order'], instr)
 
 
-  print(prog.get_instr_dict())
+  #print(prog.get_instr_dict())
 
-  print("Sort:")
+  #print("Sort:")
 
   prog.sort()
 
-  print(prog.get_instr_dict())
+  #print(prog.get_instr_dict())
+
+  # DRUHA SECOND CAST PROGRAMU
 
   #i = 1
   #prochazeni neni do len, ale podle order
   # TODO sekvence nemusi byt souvisla
   # TODO vyresit skoky
+  print('POLEEEEEEEEEEEEEEE+++++++++++++++++++++++++++++++++++++')
+  order_list = list(prog.get_instr_dict().keys())
+  print(order_list)
+  index = 0
+  while index < len(order_list):
+    prog.set_instr_counter(order_list[index])
+    print(prog.get_instr_counter())
+    #print(index)
+    # if JUMP then prog.set_instr_counter('25') else index++
+    print(order_list[index])
+    ins = prog.get_instr_dict()[order_list[index]]
+    ins.execute()
+
+    # detekce zmeny behu programu
+    if prog.get_instr_counter() != order_list[index]:
+      order_list.index(prog.get_instr_counter())
+      print('JSEM VE ZMENE ORDERU')
+      
+    index += 1
+
+    """
+    setneme IC na index
+    ins.execute
+    if IC != na indexu tak index upravime jinak index++
+    """
+  """
   for i in prog.get_instr_dict():
   #while i < len(prog.get_instr_dict()):
     print("While " + str(i))
     ins = prog.get_instr_dict()[str(i)]
-    print('Bef')
     ins.execute()
-    print(ins)
+
+    i = '5'
+    print('nove i:' + i)
+    
 
     #i += 1
+
+  """
 
 # xml check
 
@@ -389,7 +604,7 @@ if __name__ == '__main__':
 
   xml_load(source_file)
 
-  sys.stderr.write("Sth\n");
+  sys.stderr.write("Program successfully processed.\n");
 
 
   #exit(blah)
