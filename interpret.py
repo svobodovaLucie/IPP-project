@@ -24,7 +24,20 @@ class Program:
     self._lf_stack = []
     self._call_stack = []
     self._instr_counter = 0 # ma v sobe order, ne index pole!!!
+    self._label_dict = {}
     
+  def add_label(self, name, order):
+    if name in self._label_dict:
+      sys.stderr.write('Label ' + name + ' already exists.\n')
+      exit(52)
+    self._label_dict[name] = order
+
+  def get_label_order(self, label_name):
+    if not label_name in self._label_dict:
+      sys.stderr.write('Label ' + label_name + ' doesn\'t exist.\n')
+      exit(52)
+    return self._label_dict[label_name]
+
   def set_instr_counter(self, order):
     self._instr_counter = order
 
@@ -411,6 +424,24 @@ class Write(Instruction):
     # TODO remove
     print('')
 
+class Label(Instruction):
+  def __init__(self, arg1v, arg1t, order):
+    super().__init__("LABEL")
+    self.set_arg1(arg1v, arg1t)
+    prog.add_label(arg1v, order)
+
+  def execute(self):
+    print('Executing label (label does nothing).')
+    pass
+  
+class Jump(Instruction):
+  def __init__(self, arg1v, arg1t):
+    super().__init__("JUMP")
+    self.set_arg1(arg1v, arg1t)
+
+  def execute(self):
+    # zmena rizeni toku programu
+    prog.set_instr_counter(prog.get_label_order(self._arg1.get_value()))
 
 class Factory:
   @classmethod
@@ -438,6 +469,11 @@ class Factory:
       return Read(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'])
     elif opcode == 'WRITE':
       return Write(root[0].text, root[0].attrib['type'])
+
+    elif opcode == 'LABEL':
+      return Label(root[0].text, root[0].attrib['type'], root.attrib['order'])
+    elif opcode == 'JUMP':
+      return Jump(root[0].text, root[0].attrib['type'])
     else:
       sys.stderr.write('Invalid opcode (more like not implemented yet).\n')
       #exit(52)
@@ -544,45 +580,19 @@ def xml_load(source_file):
   #prochazeni neni do len, ale podle order
   # TODO sekvence nemusi byt souvisla
   # TODO vyresit skoky
-  print('POLEEEEEEEEEEEEEEE+++++++++++++++++++++++++++++++++++++')
   order_list = list(prog.get_instr_dict().keys())
-  print(order_list)
   index = 0
   while index < len(order_list):
     prog.set_instr_counter(order_list[index])
-    print(prog.get_instr_counter())
-    #print(index)
     # if JUMP then prog.set_instr_counter('25') else index++
-    print(order_list[index])
     ins = prog.get_instr_dict()[order_list[index]]
     ins.execute()
 
     # detekce zmeny behu programu
     if prog.get_instr_counter() != order_list[index]:
-      order_list.index(prog.get_instr_counter())
-      print('JSEM VE ZMENE ORDERU')
+      index = order_list.index(prog.get_instr_counter())
       
     index += 1
-
-    """
-    setneme IC na index
-    ins.execute
-    if IC != na indexu tak index upravime jinak index++
-    """
-  """
-  for i in prog.get_instr_dict():
-  #while i < len(prog.get_instr_dict()):
-    print("While " + str(i))
-    ins = prog.get_instr_dict()[str(i)]
-    ins.execute()
-
-    i = '5'
-    print('nove i:' + i)
-    
-
-    #i += 1
-
-  """
 
 # xml check
 
