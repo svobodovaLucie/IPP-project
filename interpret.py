@@ -367,40 +367,49 @@ class Pops(Instruction):
     #print('Executing pops.')
     pass
 
-"""
 # TODO arithmetic instructions
 # TODO class for arithmetic -> then dedeni na add, sub atd.
 class Arithmetic(Instruction):
-  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
-    super().__init__(self)
-    self.set_args3(arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+  def __init__(self, opcode, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__(opcode)
+    self.set_arg(1, arg1v, arg1t)
+    self.set_arg(2, arg2v, arg2t)
+    self.set_arg(3, arg3v, arg3t)
+    #self.set_args3(arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
-  def get_check_operand(self, arg):
-    # get and check the first operand
-    if self.get_arg_type(arg) == 'var':
-      (val, typ) = prog.get_var_value_type(self.get_arg_value(arg))
-      if typ != 'int':
-        # TODO customise
-        sys.stderr.write('ADD: wrong argument type.\n')
-        exit(53)
-      # TODO cast exceptions
-      val = int(val)
-    elif self.get_arg_type(arg) == 'int':
-      val = self.get_arg_value(arg)
-    else:
+  def get_check_operand(self, arg_num):
+    # checks if the operand is int and returns it
+    # print('Executing add.')
+    (val, typ) = self.get_arg_value_type(arg_num=arg_num)
+    if typ == 'var':
+      try:
+        var_name = val
+        (val, typ) = prog.get_var_value_type(val)
+      except TypeError:
+        # TODO vypsat nil nebo error?
+        sys.stderr.write('Variable ' + var_name + ' is not defined.\n')
+        exit(56)
+    if typ != 'int':
       sys.stderr.write(self.get_opcode() + ': wrong argument type.\n')
       exit(53)
-    return (val, typ)
+    try:
+      val = int(val)
+    except TypeError:
+      sys.stderr.write(self.get_opcode() + ': wrong argument type.\n')
+      exit(53)
+    return val
 
-class Add(Instruction):
+class Add(Arithmetic):
 
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
-    super().__init__("ADD")
-    self.set_args3(arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+    super().__init__("ADD", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+    #self.set_args3(arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
   def execute(self):
     # print('Executing add.')
     # get and check the first operand
+    val1 = super().get_check_operand(arg_num=2)
+    """
     if self.get_arg2_type() == 'var':
       (val1, typ) = prog.get_var_value_type(self.get_arg2_value())
       if typ != 'int':
@@ -414,8 +423,11 @@ class Add(Instruction):
     else:
       sys.stderr.write('ADD: wrong argument type.\n')
       exit(53)
+    """
 
     # get and check the second operand
+    val2 = super().get_check_operand(arg_num=3)
+    """
     if self.get_arg3_type() == 'var':
       # TODO check ze je typu int
       (val2, typ) = prog.get_var_value_type(self.get_arg3_value())
@@ -429,10 +441,10 @@ class Add(Instruction):
     else:
       sys.stderr.write('ADD: wrong argument type.\n')
       exit(53)
+    """
 
-    result = int(val1) + int(val2)
-    prog.set_var_value(self.get_arg1_value(), (result, 'int'))
-"""
+    result = val1 + val2
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
 
 
 class Read(Instruction):
@@ -565,11 +577,9 @@ class Factory:
       return Pushs(root[0].text, root[0].attrib['type'])
     elif opcode == 'POPS':
       return Pops(root[0].text, root[0].attrib['type'])
-      """
-      elif opcode == 'ADD':
-        return Add(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'], \
-                    root[2].text, root[2].attrib['type'])
-      """
+    elif opcode == 'ADD':
+      return Add(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'], \
+                  root[2].text, root[2].attrib['type'])
     elif opcode == 'READ':
       return Read(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'])
     elif opcode == 'WRITE':
