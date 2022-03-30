@@ -199,9 +199,6 @@ class Instruction:
   def __init__(self, opcode):
     self._opcode = opcode
     self._args = [Argument, Argument, Argument]
-    #self._arg1: Argument
-    #self._arg2: Argument
-    #self._arg3: Argument
 
   def get_opcode(self):
     return self._opcode
@@ -213,65 +210,12 @@ class Instruction:
   def set_arg(self, arg_num, val, typ):
     self._args[arg_num - 1] = Argument(val, typ)
 
-  """
-  def set_arg1(self, value, typ):
-    self._arg1 = Argument(value, typ)
-    #self._arg1.set_value(arg1)
-    #self._arg1 = arg1
-
-  def set_arg2(self, value, typ):
-    #self._arg2 = arg2
-    self._arg2 = Argument(value, typ)
-    #self._arg2.set_value(arg2)
-    
-
-  def set_arg3(self, value, typ):
-    #self._arg3 = arg3
-    self._arg3 = Argument(value, typ)
-    #self._arg3.set_value(arg3)
-  """
-  """
-  def set_args2(self, value1, typ1, value2, typ2):
-    self._arg1 = Argument(value1, typ1)
-    self._arg2 = Argument(value2, typ2)
-
-  def set_args3(self, value1, typ1, value2, typ2, value3, typ3):
-    self._arg1 = Argument(value1, typ1)
-    self._arg2 = Argument(value2, typ2)
-    self._arg3 = Argument(value3, typ3)
-  """
-
   def get_arg_value(self, arg_num):
     return self._args[arg_num - 1].get_value()
 
   def get_arg_value_type(self, arg_num):
     return self._args[arg_num - 1].get_value(), self._args[arg_num - 1].get_type()
 
-  """
-  def get_arg1_value(self):
-    return self._arg1.get_value()
-
-  def get_arg1_value_type(self):
-    return self._arg1.get_value(), self._arg1.get_type()
-
-  def get_arg2_value(self):
-    return self._arg2.get_value()
-
-  def get_arg2_value_type(self):
-    return self._arg2.get_value(), self._arg2.get_type()
-
-  def get_arg3_value(self):
-    return self._arg3.get_value()
-
-  def get_arg1_type(self):
-    return self._arg1.get_type()
-
-  def get_arg2_type(self):
-    return self._arg2.get_type()
-
-  def get_arg3_type(self):
-    return self._arg3.get_type()
-  """
 
 class Move(Instruction):
 
@@ -367,19 +311,15 @@ class Pops(Instruction):
     #print('Executing pops.')
     pass
 
-# TODO arithmetic instructions
-# TODO class for arithmetic -> then dedeni na add, sub atd.
 class Arithmetic(Instruction):
   def __init__(self, opcode, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__(opcode)
     self.set_arg(1, arg1v, arg1t)
     self.set_arg(2, arg2v, arg2t)
     self.set_arg(3, arg3v, arg3t)
-    #self.set_args3(arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
   def get_check_operand(self, arg_num):
     # checks if the operand is int and returns it
-    # print('Executing add.')
     (val, typ) = self.get_arg_value_type(arg_num=arg_num)
     if typ == 'var':
       try:
@@ -403,45 +343,11 @@ class Add(Arithmetic):
 
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("ADD", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
-    #self.set_args3(arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
   def execute(self):
-    # print('Executing add.')
-    # get and check the first operand
+    # get and check the operands
     val1 = super().get_check_operand(arg_num=2)
-    """
-    if self.get_arg2_type() == 'var':
-      (val1, typ) = prog.get_var_value_type(self.get_arg2_value())
-      if typ != 'int':
-        # TODO customise
-        sys.stderr.write('ADD: wrong argument type.\n')
-        exit(53)
-      # TODO cast exceptions
-      val1 = int(val1)
-    elif self.get_arg2_type() == 'int':
-      val1 = self.get_arg2_value()
-    else:
-      sys.stderr.write('ADD: wrong argument type.\n')
-      exit(53)
-    """
-
-    # get and check the second operand
     val2 = super().get_check_operand(arg_num=3)
-    """
-    if self.get_arg3_type() == 'var':
-      # TODO check ze je typu int
-      (val2, typ) = prog.get_var_value_type(self.get_arg3_value())
-      if typ != 'int':
-        # TODO customise
-        sys.stderr.write('ADD: wrong argument type.\n')
-        exit(53)
-      val2 = int(val2)  # TODO cast exceptions
-    elif self.get_arg3_type() == 'int':
-      val2 = self.get_arg3_value()
-    else:
-      sys.stderr.write('ADD: wrong argument type.\n')
-      exit(53)
-    """
 
     result = val1 + val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
