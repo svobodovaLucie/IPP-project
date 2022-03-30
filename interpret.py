@@ -75,8 +75,8 @@ class Program:
       #print(self._tf.get_frame_dict())
       return self._tf
     else:
-      print('SOMETHING BAD HAPPENED')
-      print(frame_name)
+      #print('SOMETHING BAD HAPPENED')
+      #print(frame_name)
       exit(-1)  # TODO nemelo by nastat ale
 
   def get_frame_dict(self, frame_name):
@@ -235,7 +235,6 @@ class Move(Instruction):
     #print('Executing move.')
     #prog.set_var_value(self.get_arg1_value(), self.get_arg2_value_type())
     prog.set_var_value(self.get_arg_value(arg_num=1), self.get_arg_value_type(arg_num=2))
-    #print(prog.get_frame_dict('GF'))
     #print(prog.get_frame_dict('LF'))
 
     
@@ -463,11 +462,6 @@ class Gt(Arithmetic):
     if typ == 'nil':
       sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
       exit(53)
-    """
-    result = 'false'
-    if val1 > val2:
-      result = 'true'
-    """
     result = val1 > val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
@@ -634,7 +628,6 @@ class Write(Instruction):
         # TODO vypsat nil nebo error?
         sys.stderr.write('Variable ' + var_name + ' is not defined.\n')
         exit(56)
-      print(prog.get_frame_dict('GF'))
     if typ == 'nil':
       print('', end='')
     elif typ == 'bool':
@@ -737,7 +730,6 @@ class Setchar(Arithmetic):
         sys.stderr.write('SETCHAR: variable is not defined.\n')
         exit(56)
     if typ != 'var' and symb1_typ != 'int' and symb2_typ != 'string':
-      print(typ, symb1_typ, symb2_typ)
       sys.stderr.write('SETCHAR: wrong operand type.\n')
       exit(53)
     try:
@@ -776,7 +768,6 @@ class Type(Instruction):
         symb_typ = ''
     prog.set_var_value(self.get_arg_value(arg_num=1), (symb_typ, 'string'))
     
-
 class Label(Instruction):
   def __init__(self, arg1v, arg1t, order):
     super().__init__("LABEL")
@@ -796,6 +787,73 @@ class Jump(Instruction):
     # zmena rizeni toku programu
     #print('Executing jump.')
     prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
+
+class Jumpifeq(Instruction):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("JUMPIFEQ")
+    self.set_arg(1, arg1v, arg1t)
+    self.set_arg(2, arg2v, arg2t)
+    self.set_arg(3, arg3v, arg3t)
+
+  def execute(self):
+    # zmena rizeni toku programu
+    (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
+    (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
+    if symb1_typ == 'var':
+      try:  # muze byt None
+        (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
+      except:
+        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
+        exit(56)
+    if symb2_typ == 'var':
+      try:  # muze byt None
+        (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
+      except:
+        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
+        exit(56)
+    if symb1_typ == symb2_typ:
+      if symb1_val == symb2_val:
+        prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
+    elif symb1_typ == 'nil' or symb2_typ == 'nil':
+      #print('Not sure co s tim nilem')
+      pass
+    else:
+      sys.stderr.write('JUMPIFEQ: wrong operand type.\n')
+      exit(53)
+
+class Jumpifneq(Instruction):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("JUMPIFNEQ")
+    self.set_arg(1, arg1v, arg1t)
+    self.set_arg(2, arg2v, arg2t)
+    self.set_arg(3, arg3v, arg3t)
+
+  def execute(self):
+    # zmena rizeni toku programu
+    #print('Executing jump.')
+    (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
+    (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
+    if symb1_typ == 'var':
+      try:  # muze byt None
+        (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
+      except:
+        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
+        exit(56)
+    if symb2_typ == 'var':
+      try:  # muze byt None
+        (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
+      except:
+        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
+        exit(56)
+    if symb1_typ == symb2_typ:
+      if symb1_val != symb2_val:
+        prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
+    elif symb1_typ == 'nil' or symb2_typ == 'nil':
+      #print('Not sure co s tim nilem')
+      pass
+    else:
+      sys.stderr.write('JUMPIFNEQ: wrong operand type.\n')
+      exit(53)
 
 class Exit(Instruction):
   def __init__(self, arg1v, arg1t):
@@ -817,6 +875,21 @@ class Exit(Instruction):
       # je to vubec v Pythonu treba osetrovat?
       exit(exit_code)
 
+class Dprint(Instruction):
+  def __init__(self, arg1v, arg1t):
+      super().__init__("DPRINT")
+      self.set_arg(1, arg1v, arg1t)
+
+  def execute(self):
+    (val, typ) = self.get_arg_value_type(arg_num=1)
+    sys.stderr.write(val + '\n')
+
+class Break(Instruction):
+  def __init__(self):
+      super().__init__("BREAK")
+
+  def execute(self):
+    sys.stderr.write('BREAK SOMETHING\n')
 
 class Factory:
   @classmethod
@@ -898,11 +971,20 @@ class Factory:
       return Label(root[0].text, root[0].attrib['type'], root.attrib['order'])
     elif opcode == 'JUMP':
       return Jump(root[0].text, root[0].attrib['type'])
+    elif opcode == 'JUMPIFEQ':
+      return Jumpifeq(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'JUMPIFNEQ':
+      return Jumpifneq(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'DPRINT':
+      return Dprint(root[0].text, root[0].attrib['type'])
+    elif opcode == 'BREAK':
+      return Break()
     else:
       sys.stderr.write('Invalid opcode (more like not implemented yet).\n')
       #exit(52)
       return -1
-
 
 # argparse
 def parse_arguments():
@@ -965,6 +1047,20 @@ def parse_arguments():
 
   return source_file, input_file
 
+"""
+def parse_arguments():
+    ap = argparse.ArgumentParser()
+    #ap.add_argument("--help", help="Idk help")
+    ap.add_argument("--source", nargs=1, help="Idk src", action='append')
+    ap.add_argument("--input", nargs=1, help="Idk inp", action='append')
+
+    args = vars(ap.parse_args())  # dict with attributes
+    #print(args)
+    #print(args['source'])
+    #print(args['input'])
+"""
+
+
 # xml load
 def xml_load(source_file):
   tree = ElementTree()
@@ -1021,13 +1117,14 @@ def xml_load(source_file):
 if __name__ == '__main__':
 
   source_file, input_file = parse_arguments()
+  #parse_arguments()
 
   prog = Program()
 
   xml_load(source_file)
 
-  #sys.stderr.write("Program successfully processed.\n")
-  print("\n\nProgram successfully processed.")
+  sys.stderr.write("Program successfully processed.\n")
+  #print("\n\nProgram successfully processed.")
 
 
   #exit(blah)
