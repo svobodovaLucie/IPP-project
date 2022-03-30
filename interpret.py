@@ -2,18 +2,12 @@ import argparse
 #from posixpath import supports_unicode_filenames
 import sys
 import os
-from traceback import print_tb
+#from traceback import print_tb
 from xml.etree.ElementTree import ElementTree
+import re
 
+# Program is a Singleton
 class Program:
-  # attributes:
-  """
-  gf: Frame
-  lf: Frame
-  tf: Frame
-  lf_list: []
-  instr_dict: {}
-  """
   def __init__(self):
     self._instr_dict = {}
     self._lf: Frame = None
@@ -69,17 +63,19 @@ class Program:
       if self._lf == None:
         sys.stderr.write('Uninitialised local frame.\n')
         exit(55)
-      print("LF dict: ")
-      print(self._lf.get_frame_dict())
+      #print("LF dict: ")
+      #print(self._lf.get_frame_dict())
       return self._lf
     elif frame_name[0:2] == 'TF':
       if self._tf == None:
         sys.stderr.write('Uninitialised temporary frame.\n')
         exit(55)
-      print("TF dict: ")
-      print(self._tf.get_frame_dict())
+      #print("TF dict: ")
+      #print(self._tf.get_frame_dict())
       return self._tf
     else:
+      print('SOMETHING BAD HAPPENED')
+      print(frame_name)
       exit(-1)  # TODO nemelo by nastat ale
 
   def get_frame_dict(self, frame_name):
@@ -93,12 +89,18 @@ class Program:
 
   def set_var(self, name_type):
     name, typ = (name_type)
-    print(name + "TYP: " + typ)
+    #print(name + " TYP: " + typ)
     self.get_frame(name).set_var(name, typ)
 
   def set_var_value(self, name, value_type):
     value, typ = (value_type)
     self.get_frame(name).set_var_value(name, value, typ)
+
+  def get_var_value(self, name):
+    return self.get_frame(name).get_var_value(name[3:])
+
+  def get_var_value_type(self, name):
+    return self.get_frame(name).get_var_value_type(name[3:])
 
   def set_tf_frame(self):
     self._tf = Frame()
@@ -125,17 +127,13 @@ class Program:
       self._lf = self._lf_stack[-1] # top
     else:
       self._lf = None
-    
-
 
 class Frame:
   def __init__(self):
-    #print("Frame init\n")
     self._frame_dict = {}
 
   def set_var(self, name, typ):
     # slouzi pro DEFVAR - hodnotu jeste nezname
-    # osetrit, zda tam jeste 'name' neni
     name = name[3:]
     if name in self._frame_dict:
       sys.stderr.write('Redefinition of variable ' + name + '.\n')
@@ -157,19 +155,25 @@ class Frame:
     
     #TODO podle typu priradit hodnotu
     if valtype == 'var':
-      self._frame_dict[name] = prog.get_frame(value).get_var_value(value[3:])
+      self._frame_dict[name] = (prog.get_frame(value).get_var_value(value[3:]), 'var')
       #self._frame_dict[name] = self.get_var_value(value[3:]) #self._frame_dict[value[3:]]
       # kktina, potrebuju ziskat hodnotu dane promenne ze slovniku
       
     else:
-      self._frame_dict[name] = value
+      self._frame_dict[name] = (value, valtype)
 
   def get_var_value(self, name):
     # co udela kdyz tam promenna nebude? exception nebo vrati None? osetrit TODO
     if not name in self._frame_dict:
       sys.stderr.write('Var ' + name + ' is not defined.\n')
       exit(54)
+    return self._frame_dict[name][0]
 
+  def get_var_value_type(self, name):
+    # co udela kdyz tam promenna nebude? exception nebo vrati None? osetrit TODO
+    if not name in self._frame_dict:
+      sys.stderr.write('Var ' + name + ' is not defined.\n')
+      exit(54)
     return self._frame_dict[name]
 
   def get_frame_dict(self):
@@ -204,7 +208,8 @@ class Instruction:
     return self._opcode
 
   def execute(self):
-    print('something default')
+    pass
+    #print('something default')
 
   def set_arg1(self, value, typ):
     self._arg1 = Argument(value, typ)
@@ -268,10 +273,10 @@ class Move(Instruction):
     #self.set_arg2(arg2v, arg2t)
 
   def execute(self):
-    print('Executing move.')
+    #print('Executing move.')
     prog.set_var_value(self.get_arg1_value(), self.get_arg2_value_type())
-    print(prog.get_frame_dict('GF'))
-    print(prog.get_frame_dict('LF'))
+    #print(prog.get_frame_dict('GF'))
+    #print(prog.get_frame_dict('LF'))
 
     
 class Createframe(Instruction):
@@ -280,21 +285,15 @@ class Createframe(Instruction):
 
   def execute(self):
     #vytvori novy TF a zahodi obsah puvodniho TF
-    print('Executing createframe.')
+    #print('Executing createframe.')
     prog.set_tf_frame()
-    print("GF dict:")
-    print(prog.get_frame_dict('GF'))
-    print("LF dict:")
-    print(prog.get_frame_dict('LF'))
-    print("TF dict:")
-    print(prog.get_frame_dict('TF'))
 
 class Pushframe(Instruction):
   def __init__(self):
     super().__init__("PUSHFRAME")
 
   def execute(self):
-    print('Executing pushframe.')
+    #print('Executing pushframe.')
     prog.push_frame()
 
 class Popframe(Instruction):
@@ -302,7 +301,7 @@ class Popframe(Instruction):
     super().__init__("POPFRAME")
 
   def execute(self):
-    print('Executing popframe.')
+    #print('Executing popframe.')
     prog.pop_frame()
 
 # class for the DEFVAR instruction
@@ -312,7 +311,7 @@ class Defvar(Instruction):
     self.set_arg1(arg1v, arg1t)
 
   def execute(self):
-    print('Executing defvar.')
+    #print('Executing defvar.')
     # inserts new variable with None value in the frame
     prog.set_var(self.get_arg1_value_type())
     
@@ -323,7 +322,7 @@ class Call(Instruction):
     self.set_arg1(arg1v, arg1t)
 
   def execute(self):
-    print('Executing call.')
+    #print('Executing call.')
     # save the current position
     prog.call_stack_push(prog.get_instr_counter())
     # jump to the label
@@ -335,7 +334,7 @@ class Return(Instruction):
     super().__init__("RETURN")
 
   def execute(self):
-    print('Executing return.')
+    #print('Executing return.')
     pos = prog.call_stack_pop()
     prog.set_instr_counter(pos)
 
@@ -344,16 +343,85 @@ class Pushs(Instruction):
     super().__init__("PUSHS")
 
   def execute(self):
-    print('Executing pushs.')
+    #print('Executing pushs.')
+    pass
 
 class Pops(Instruction):
   def __init__(self):
     super().__init__("POPS")
 
   def execute(self):
-    print('Executing pops.')
+    #print('Executing pops.')
+    pass
 
+"""
 # TODO arithmetic instructions
+# TODO class for arithmetic -> then dedeni na add, sub atd.
+class Arithmetic(Instruction):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__(self)
+    self.set_args3(arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def get_check_operand(self, arg):
+    # get and check the first operand
+    if self.get_arg_type(arg) == 'var':
+      (val, typ) = prog.get_var_value_type(self.get_arg_value(arg))
+      if typ != 'int':
+        # TODO customise
+        sys.stderr.write('ADD: wrong argument type.\n')
+        exit(53)
+      # TODO cast exceptions
+      val = int(val)
+    elif self.get_arg_type(arg) == 'int':
+      val = self.get_arg_value(arg)
+    else:
+      sys.stderr.write(self.get_opcode() + ': wrong argument type.\n')
+      exit(53)
+    return (val, typ)
+
+"""
+class Add(Instruction):
+
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("ADD")
+    self.set_args3(arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def execute(self):
+    # print('Executing add.')
+    # get and check the first operand
+    if self.get_arg2_type() == 'var':
+      (val1, typ) = prog.get_var_value_type(self.get_arg2_value())
+      if typ != 'int':
+        # TODO customise
+        sys.stderr.write('ADD: wrong argument type.\n')
+        exit(53)
+      # TODO cast exceptions
+      val1 = int(val1)
+    elif self.get_arg2_type() == 'int':
+      val1 = self.get_arg2_value()
+    else:
+      sys.stderr.write('ADD: wrong argument type.\n')
+      exit(53)
+
+    # get and check the second operand
+    if self.get_arg3_type() == 'var':
+      # TODO check ze je typu int
+      (val2, typ) = prog.get_var_value_type(self.get_arg3_value())
+      if typ != 'int':
+        # TODO customise
+        sys.stderr.write('ADD: wrong argument type.\n')
+        exit(53)
+      val2 = int(val2)  # TODO cast exceptions
+    elif self.get_arg3_type() == 'int':
+      val2 = self.get_arg3_value()
+    else:
+      sys.stderr.write('ADD: wrong argument type.\n')
+      exit(53)
+
+    result = int(val1) + int(val2)
+    prog.set_var_value(self.get_arg1_value(), (result, 'int'))
+
+
 
 class Read(Instruction):
 
@@ -362,7 +430,7 @@ class Read(Instruction):
     self.set_args2(arg1v, arg1t, arg2v, arg2t)
 
   def execute(self):
-    print('Executing read.')
+    # print('\nExecuting read.')
     if input_file == '<stdin>':
       try:
         inp = input()
@@ -389,6 +457,7 @@ class Read(Instruction):
           inp = 'false'
     except ValueError:
       inp = None
+    prog.set_var_value(self.get_arg1_value(), (inp, self.get_arg2_value()))
 
 class Write(Instruction):
   def __init__(self, arg1v, arg1t):
@@ -396,18 +465,24 @@ class Write(Instruction):
     self.set_arg1(arg1v, arg1t)
 
   def execute(self):
-    print('Executing write.')
-    if self.get_arg1_type() == 'nil':
+    #print('Executing write.')
+    if self.get_arg1_type() == 'var':
+      (val, typ) = prog.get_var_value_type(self.get_arg1_value()) #'var'
+    else:
+      typ = self.get_arg1_type()
+      val = self.get_arg1_value()
+
+    if typ == 'nil':
       print('', end='')
-    elif self.get_arg1_type() == 'bool':
-      if self.get_arg1_value().upper() == 'TRUE':
+    elif typ == 'bool':
+      if val.upper() == 'TRUE':
         print('true', end='')
       else:
         print('false', end='')
+    elif typ == 'int':
+      print(val, end='')
     else:
-      print(self.get_arg1_value(), end='')
-    # TODO remove
-    print('')
+      print(re.sub(r'\\([0-9]{3})', lambda x: chr(int(x[1])), val), end='')
 
 class Label(Instruction):
   def __init__(self, arg1v, arg1t, order):
@@ -416,7 +491,7 @@ class Label(Instruction):
     prog.add_label(arg1v, order)
 
   def execute(self):
-    print('Executing label (label does nothing).')
+    #print('Executing label (label does nothing).')
     pass
   
 class Jump(Instruction):
@@ -426,8 +501,28 @@ class Jump(Instruction):
 
   def execute(self):
     # zmena rizeni toku programu
-    print('Executing jump.')
+    #print('Executing jump.')
     prog.set_instr_counter(prog.get_label_order(self._arg1.get_value()))
+
+class Exit(Instruction):
+  def __init__(self, arg1v, arg1t):
+      super().__init__("EXIT")
+      self.set_arg1(arg1v, arg1t)
+
+  def execute(self):
+    try:
+      exit_code = int(self.get_arg1_value())
+    except ValueError:
+      sys.stderr.write('Invalid EXIT number.\n')
+      exit(57)
+    if (self.get_arg1_type() != 'int' or exit_code < 0 or exit_code > 49):
+      sys.stderr.write('Invalid EXIT number.\n')
+      exit(57)
+    else:
+      # TODO osetrit uzavreni souboru atd. -> pak return asi
+      # je to vubec v Pythonu treba osetrovat?
+      exit(exit_code)
+
 
 class Factory:
   @classmethod
@@ -451,10 +546,15 @@ class Factory:
       return Pushs(root[0].text, root[0].attrib['type'])
     elif opcode == 'POPS':
       return Pops(root[0].text, root[0].attrib['type'])
-    if opcode == 'READ':
+    elif opcode == 'ADD':
+      return Add(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'], \
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'READ':
       return Read(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'])
     elif opcode == 'WRITE':
       return Write(root[0].text, root[0].attrib['type'])
+    elif opcode == 'EXIT':
+      return Exit(root[0].text, root[0].attrib['type'])
 
     elif opcode == 'LABEL':
       return Label(root[0].text, root[0].attrib['type'], root.attrib['order'])
@@ -474,9 +574,11 @@ def parse_arguments():
   ap.add_argument("--input", nargs=1, help="Idk inp", action='append')
 
   args = vars(ap.parse_args())  # dict with attributes
-  print(args)
-  print(args['source'])
-  print(args['input'])
+  #print(args)
+  #print(args['source'])
+  #print(args['input'])
+
+  # if help is not None and anything else is inserted then exit
 
   if args['source'] is None:
     if args['input'] is None:
@@ -512,7 +614,7 @@ def parse_arguments():
       input_file = args['input'][0][0]
     else:
       # Print message if the file does not exist
-      print("File " + args['input'][0][0] + " does not exist.")
+      #print("File " + args['input'][0][0] + " does not exist.")
       exit(11)
     
     if os.path.exists(args['source'][0][0]):
@@ -520,7 +622,7 @@ def parse_arguments():
       source_file = args['source'][0][0]
     else:
       # Print message if the file does not exist
-      print("File " + args['source'][0][0] + " does not exist.")
+      #print("File " + args['source'][0][0] + " does not exist.")
       exit(11)
 
   return source_file, input_file
@@ -551,7 +653,7 @@ def xml_load(source_file):
   index = 0
 
   while index < len(order_list):
-    print(order_list[index])
+    #print(order_list[index])
     # set instruction counter to the order on current index
     prog.set_instr_counter(order_list[index])
 
@@ -586,7 +688,8 @@ if __name__ == '__main__':
 
   xml_load(source_file)
 
-  sys.stderr.write("Program successfully processed.\n");
+  #sys.stderr.write("Program successfully processed.\n")
+  print("\n\nProgram successfully processed.")
 
 
   #exit(blah)
