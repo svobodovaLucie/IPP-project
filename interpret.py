@@ -1,4 +1,5 @@
 import argparse
+from multiprocessing.sharedctypes import Value
 #from posixpath import supports_unicode_filenames
 import sys
 import os
@@ -182,6 +183,8 @@ class Frame:
 class Argument:
 
   def __init__(self, value, typ):
+    if typ == 'string':
+      value = re.sub(r'\\([0-9]{3})', lambda x: chr(int(x[1])), value)
     self._value = value
     self._typ = typ
 
@@ -343,6 +346,19 @@ class Arithmetic(Instruction):
     # return (val1, val2, typ)
     (val1, typ1) = self.get_arg_value_type(arg_num=2)
     (val2, typ2) = self.get_arg_value_type(arg_num=3)
+    # TODO pridano - check, jestli to funguje ok
+    if typ1 == 'var':
+      try:  # muze byt None
+        (val1, typ1) = prog.get_var_value_type(val1)
+      except:
+        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
+        exit(56)
+    if typ2 == 'var':
+      try:  # muze byt None
+        (val1, typ1) = prog.get_var_value_type(val1)
+      except:
+        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
+        exit(56)
     if typ1 == typ2 == 'int':
       try:
         val1 = int(val1)
@@ -362,7 +378,14 @@ class Arithmetic(Instruction):
         sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
         exit(53)
     elif typ1 == typ2 == 'bool':
-      pass
+      if val1.upper() == 'TRUE':
+        val1 = True
+      else:
+        val1 = False
+      if val2.upper() == 'TRUE':
+        val2 = True
+      else:
+        val2 = False
     else:
       sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
       exit(53)
@@ -423,9 +446,12 @@ class Lt(Arithmetic):
     if typ == 'nil':
       sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
       exit(53)
+    """
     result = 'false'
-    if val1 < val2:    # FIXME porovnani retezcu a boolu
+    if val1 < val2:
       result = 'true'
+    """
+    result = val1 < val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
 class Gt(Arithmetic):
@@ -437,9 +463,12 @@ class Gt(Arithmetic):
     if typ == 'nil':
       sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
       exit(53)
+    """
     result = 'false'
-    if val1 > val2:    # FIXME porovnani retezcu a boolu
+    if val1 > val2:
       result = 'true'
+    """
+    result = val1 > val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
 class Eq(Arithmetic):
@@ -448,10 +477,101 @@ class Eq(Arithmetic):
 
   def execute(self):
     (val1, val2, typ) = super().check_operand_type_eq()
-    result = 'false'
-    if typ == 'nil' or val1 == val2:    # FIXME porovnani retezcu a boolu
-      result = 'true'
+    result = False
+    if typ == 'nil' or val1 == val2:
+      result = True
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
+
+class And(Arithmetic):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("AND", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def execute(self):
+    (val1, val2, typ) = super().check_operand_type_eq()
+    if typ != 'bool':
+      sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+      exit(53)
+    result = val1 and val2
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
+
+class Or(Arithmetic):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("OR", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def execute(self):
+    (val1, val2, typ) = super().check_operand_type_eq()
+    if typ != 'bool':
+      sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+      exit(53)
+    result = val1 or val2
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
+
+class Not(Instruction):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t):
+    super().__init__("NOT")
+    self.set_arg(1, arg1v, arg1t)
+    self.set_arg(2, arg2v, arg2t)
+
+  def execute(self):
+    (val, typ) = self.get_arg_value_type(arg_num=2)
+    if typ != 'bool':
+      sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+      exit(53)
+    val_bool = False
+    if val.upper() == 'TRUE':
+      val_bool = True
+    result = not val_bool
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
+
+class Int2char(Instruction):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t):
+    super().__init__("INT2CHAR")
+    self.set_arg(1, arg1v, arg1t)
+    self.set_arg(2, arg2v, arg2t)
+
+  def execute(self):
+    val = self.get_arg_value(arg_num=2)
+    try:
+      result = chr(int(val))
+    except:
+      sys.stderr.write('INT2CHAR: Invalid integer value.\n')
+      exit(58)
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'string'))
+
+
+class Stri2int(Instruction):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("STRI2INT")
+    self.set_arg(1, arg1v, arg1t)
+    self.set_arg(2, arg2v, arg2t)
+    self.set_arg(3, arg3v, arg3t)
+
+  def execute(self):
+    # TODO osetrit None?
+    (val1, typ1) = self.get_arg_value_type(arg_num=2)
+    (val2, typ2) = self.get_arg_value_type(arg_num=3)
+    if typ1 == 'var':
+      try:  # muze byt None
+        (val1, typ1) = prog.get_var_value_type(val1)
+      except:
+        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
+        exit(56)
+    if typ2 == 'var':
+      try:  # muze byt None
+        (val1, typ1) = prog.get_var_value_type(val1)
+      except:
+        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
+        exit(56)
+    if typ1 != 'string' and typ2 != 'int':
+      sys.stderr.write('STRI2INT: Invalid operand type.\n')
+      exit(53)
+    try:
+      result = ord(val1[int(val2)])
+    except:
+      sys.stderr.write('STRI2INT: Index out of range.\n')
+      exit(58)
+    # TypeError exception if invalid chr()?
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
 
 
 class Read(Instruction):
@@ -476,6 +596,7 @@ class Read(Instruction):
         sys.stderr.write('File ' + input_file + 'not found.\n')
         exit(11)
       inp = f.readline()
+      inp = inp.rstrip('\n')
 
     try:
       #inp = input_file.readline()
@@ -499,28 +620,162 @@ class Write(Instruction):
 
   def execute(self):
     #print('Executing write.')
+    # TODO catch exceptions napr. kdyz je promenna (111, 'string') nebo naopak
     (val, typ) = self.get_arg_value_type(arg_num=1)
     if typ == 'var':
       try:
         var_name = val
-        (val, typ) = prog.get_var_value_type(val)
+        try:
+          (val, typ) = prog.get_var_value_type(val)
+        except:
+          sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
+          exit(56)
       except TypeError:
         # TODO vypsat nil nebo error?
         sys.stderr.write('Variable ' + var_name + ' is not defined.\n')
         exit(56)
       print(prog.get_frame_dict('GF'))
-
     if typ == 'nil':
       print('', end='')
     elif typ == 'bool':
-      if val.upper() == 'TRUE':
+      if val:
         print('true', end='')
       else:
         print('false', end='')
     elif typ == 'int':
       print(val, end='')
     else:
-      print(re.sub(r'\\([0-9]{3})', lambda x: chr(int(x[1])), val), end='')
+      print(val, end='')
+      #print(re.sub(r'\\([0-9]{3})', lambda x: chr(int(x[1])), val), end='')
+
+class Concat(Arithmetic):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("CONCAT", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def execute(self):
+    (val1, val2, typ) = super().check_operand_type_eq()
+
+    if typ != 'string':
+      sys.stderr.write('CONCAT: wrong operand type.\n')
+      exit(53)
+    prog.set_var_value(self.get_arg_value(arg_num=1), (val1 + val2, 'string'))
+
+class Strlen(Instruction):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t):
+    super().__init__("STRLEN")
+    self.set_arg(1, arg1v, arg1t)
+    self.set_arg(2, arg2v, arg2t)
+
+  def execute(self):
+    (val, typ) = self.get_arg_value_type(arg_num=2)
+    if typ == 'var':
+      try:
+        (val, typ) = prog.get_var_value_type(val)
+      except:
+        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
+        exit(56)
+    if typ != 'string':
+      sys.stderr.write('STRLEN: wrong operand type.\n')
+      exit(53)
+    try:
+      result = len(val)
+    except:
+      sys.stderr.write('STRLEN: wrong operand type.\n')
+      exit(53)
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
+
+class Getchar(Arithmetic):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("GETCHAR", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def execute(self):
+    # TODO osetrit None?
+    (val1, typ1) = self.get_arg_value_type(arg_num=2)
+    (val2, typ2) = self.get_arg_value_type(arg_num=3)
+    if typ1 == 'var':
+      try:  # muze byt None
+        (val1, typ1) = prog.get_var_value_type(val1)
+      except:
+        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
+        exit(56)
+    if typ2 == 'var':
+      try:  # muze byt None
+        (val2, typ2) = prog.get_var_value_type(val2)
+      except:
+        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
+        exit(56)
+    if typ1 != 'string' and typ2 != 'int':
+      sys.stderr.write('GETCHAR: Invalid operand type.\n')
+      exit(53)
+    try:
+      result = val1[int(val2)]
+    except:
+      sys.stderr.write('GETCHAR: Index out of range.\n')
+      exit(58)
+    # TypeError exception if invalid chr()?
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'string'))
+
+class Setchar(Arithmetic):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("SETCHAR", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def execute(self):
+    # get the value of variable
+    (var, typ) = self.get_arg_value_type(arg_num=1)
+    (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
+    (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
+    if symb1_typ == 'var':
+      try:
+        (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
+      except TypeError:
+        sys.stderr.write('SETCHAR: variable is not defined.\n')
+        exit(56)
+    if symb2_typ == 'var':
+      try:
+        (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
+      except TypeError:
+        sys.stderr.write('SETCHAR: variable is not defined.\n')
+        exit(56)
+    if typ != 'var' and symb1_typ != 'int' and symb2_typ != 'string':
+      print(typ, symb1_typ, symb2_typ)
+      sys.stderr.write('SETCHAR: wrong operand type.\n')
+      exit(53)
+    try:
+      (var_val, var_typ) = prog.get_var_value_type(var)
+    except TypeError:
+      sys.stderr.write('SETCHAR: variable is not defined.\n')
+      exit(56)
+    if var_typ != 'string':
+      sys.stderr.write('SETCHAR: wrong operand type.\n')
+      exit(53)
+    try:
+      index = int(symb1_val)
+      result = var_val[:index] + symb2_val[0] + var_val[(index+1):]
+    except TypeError:
+      sys.stderr.write('SETCHAR: index out of range.\n')
+      exit(53)
+    except ValueError:
+      sys.stderr.write('SETCHAR: wrong operand type.\n')
+      exit(53)
+    prog.set_var_value(var, (result, 'string'))
+
+class Type(Instruction):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t):
+    super().__init__("TYPE")
+    self.set_arg(1, arg1v, arg1t)
+    self.set_arg(2, arg2v, arg2t)
+
+  def execute(self):
+    (symb_val, symb_typ) = self.get_arg_value_type(arg_num=2)
+    if symb_typ == 'var':
+      try:
+        (var_val, var_typ) = prog.get_var_value_type(symb_val)
+        symb_typ = var_typ
+      except:
+        # None - neinicializovana
+        symb_typ = ''
+    prog.set_var_value(self.get_arg_value(arg_num=1), (symb_typ, 'string'))
+    
 
 class Label(Instruction):
   def __init__(self, arg1v, arg1t, order):
@@ -606,10 +861,36 @@ class Factory:
     elif opcode == 'EQ':
       return Eq(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
                   root[2].text, root[2].attrib['type'])
+    elif opcode == 'AND':
+      return And(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'OR':
+      return Or(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'NOT':
+      return Not(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'])
+    elif opcode == 'INT2CHAR':
+      return Int2char(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'])
+    elif opcode == 'STRI2INT':
+      return Stri2int(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
     elif opcode == 'READ':
       return Read(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'])
     elif opcode == 'WRITE':
       return Write(root[0].text, root[0].attrib['type'])
+    elif opcode == 'CONCAT':
+      return Concat(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'STRLEN':
+      return Strlen(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'])
+    elif opcode == 'GETCHAR':
+      return Getchar(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'SETCHAR':
+      return Setchar(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'TYPE':
+      return Type(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'])
     elif opcode == 'EXIT':
       return Exit(root[0].text, root[0].attrib['type'])
 
