@@ -318,7 +318,7 @@ class Arithmetic(Instruction):
     self.set_arg(2, arg2v, arg2t)
     self.set_arg(3, arg3v, arg3t)
 
-  def get_check_operand(self, arg_num):
+  def get_check_int_operand(self, arg_num):
     # checks if the operand is int and returns it
     (val, typ) = self.get_arg_value_type(arg_num=arg_num)
     if typ == 'var':
@@ -334,23 +334,124 @@ class Arithmetic(Instruction):
       exit(53)
     try:
       val = int(val)
-    except TypeError:
+    except ValueError:
       sys.stderr.write(self.get_opcode() + ': wrong argument type.\n')
       exit(53)
     return val
 
-class Add(Arithmetic):
+  def check_operand_type_eq(self):
+    # return (val1, val2, typ)
+    (val1, typ1) = self.get_arg_value_type(arg_num=2)
+    (val2, typ2) = self.get_arg_value_type(arg_num=3)
+    if typ1 == typ2 == 'int':
+      try:
+        val1 = int(val1)
+        val2 = int(val2)
+      except ValueError:
+        sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+        exit(53)
+    elif  typ1 == typ2 == 'string':
+      try:
+        val1 = str(val1)
+        val2 = str(val2)
+      except ValueError:
+        sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+        exit(53) 
+    elif typ1 == typ2 == 'nil':
+      if val1 != 'nil' and val2 != 'nil':
+        sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+        exit(53)
+    elif typ1 == typ2 == 'bool':
+      pass
+    else:
+      sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+      exit(53)
+    return (val1, val2, typ1)
 
+
+class Add(Arithmetic):
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("ADD", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
   def execute(self):
     # get and check the operands
-    val1 = super().get_check_operand(arg_num=2)
-    val2 = super().get_check_operand(arg_num=3)
-
+    val1 = super().get_check_int_operand(arg_num=2)
+    val2 = super().get_check_int_operand(arg_num=3)
     result = val1 + val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
+
+class Sub(Arithmetic):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("SUB", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def execute(self):
+    val1 = super().get_check_int_operand(arg_num=2)
+    val2 = super().get_check_int_operand(arg_num=3)
+    result = val1 - val2
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
+
+class Mul(Arithmetic):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("MUL", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def execute(self):
+    val1 = super().get_check_int_operand(arg_num=2)
+    val2 = super().get_check_int_operand(arg_num=3)
+    result = val1 * val2
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
+
+class Idiv(Arithmetic):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("IDIV", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def execute(self):
+    val1 = super().get_check_operand(arg_num=2)
+    val2 = super().get_check_operand(arg_num=3)
+    try:
+      result = val1 // val2
+    except ZeroDivisionError:
+      sys.stderr.write('Division by zero.\n')
+      exit(57)
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
+
+class Lt(Arithmetic):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("LT", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def execute(self):
+    (val1, val2, typ) = super().check_operand_type_eq()
+    if typ == 'nil':
+      sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+      exit(53)
+    result = 'false'
+    if val1 < val2:    # FIXME porovnani retezcu a boolu
+      result = 'true'
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
+
+class Gt(Arithmetic):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("GT", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def execute(self):
+    (val1, val2, typ) = super().check_operand_type_eq()
+    if typ == 'nil':
+      sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+      exit(53)
+    result = 'false'
+    if val1 > val2:    # FIXME porovnani retezcu a boolu
+      result = 'true'
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
+
+class Eq(Arithmetic):
+  def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
+    super().__init__("EQ", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
+
+  def execute(self):
+    (val1, val2, typ) = super().check_operand_type_eq()
+    result = 'false'
+    if typ == 'nil' or val1 == val2:    # FIXME porovnani retezcu a boolu
+      result = 'true'
+    prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
 
 class Read(Instruction):
@@ -407,6 +508,7 @@ class Write(Instruction):
         # TODO vypsat nil nebo error?
         sys.stderr.write('Variable ' + var_name + ' is not defined.\n')
         exit(56)
+      print(prog.get_frame_dict('GF'))
 
     if typ == 'nil':
       print('', end='')
@@ -484,7 +586,25 @@ class Factory:
     elif opcode == 'POPS':
       return Pops(root[0].text, root[0].attrib['type'])
     elif opcode == 'ADD':
-      return Add(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'], \
+      return Add(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'SUB':
+      return Sub(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'MUL':
+      return Mul(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'IDIV':
+      return Idiv(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'LT':
+      return Lt(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'GT':
+      return Gt(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
+                  root[2].text, root[2].attrib['type'])
+    elif opcode == 'EQ':
+      return Eq(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'],\
                   root[2].text, root[2].attrib['type'])
     elif opcode == 'READ':
       return Read(root[0].text, root[0].attrib['type'], root[1].text, root[1].attrib['type'])
