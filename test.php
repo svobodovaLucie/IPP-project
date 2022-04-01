@@ -297,48 +297,56 @@ function exec_parser($file, $test_num) {
   global $html;
   global $failed;
 
+  // run the parser script 
   $script = $options["parse-script"];
-
-  // run the parser script
   $output = array();
   $return_val = NULL;
   exec("php8.1 $script <$file.src >$file.out_parse_tmp", $output, $return_val);
 
-  // check the return values
+  // get the expected return value
   $rc_exp = trim(file_get_contents($file.".rc"));
 
-  $test_spec = [$file.".src", $rc_exp, $return_val, "STDERRblah"];
+  $test_spec = [$file.".src", $rc_exp, $return_val];
 
-  // parse-only
+  // parse-only tests are run
   if (array_key_exists('parse-only', $options)) {
     if ($return_val != $rc_exp) {
+      // different return values -> FAIL
       html_add_test_log($test_num, $test_spec, "FAILED");
       $failed++;
     } else if ($return_val != 0) {
+      // return values match and are not 0 -> PASS
       html_add_test_log($test_num, $test_spec, "PASSED");
     } else {
-      // compare XML
+      // return values match and are 0 -> compare XML
       $jexamxml_dir = $options["jexampath"];
       exec("java -jar $jexamxml_dir"."jexamxml.jar $file.out $file.out_parse_tmp diffs.xml  -D $jexamxml_dir"."options", $output, $return_val_jexamxml);
       if ($return_val_jexamxml == 0) {
+        // XML files are not different -> PASS
         html_add_test_log($test_num, $test_spec, "PASSED");
       } else {
+        // XML files are different -> FAIL
         html_add_test_log($test_num, $test_spec, "FAILED");
         $failed++;
       }
     }
     return;
   }
-  // both
-  if ($return_val != 0) {
-    if ($return_val != $rc_exp) {
-      html_add_test_log($test_num, $test_spec, "FAILED");
-      $failed++;
-    } else {
-      html_add_test_log($test_num, $test_spec, "PASSED");
-    }
-    return 1; // indicates that the interpret shouldn't interpret the output code
-  } // else pokracujeme v interpretu
+  // both parser and interpret tests are run
+  // parser return value is 0 -> interpret tests can be run
+  if ($return_val == 0) {
+    return;
+  }
+  // parser did not return 0 -> interpret tests cannot be run
+  if ($return_val != $rc_exp) {
+    // return values does not match ->  FAIL
+    html_add_test_log($test_num, $test_spec, "FAILED");
+    $failed++;
+  } else {
+    // parser failed with expected return code -> PASS
+    html_add_test_log($test_num, $test_spec, "PASSED");
+  }
+  return 1; // indicates that the interpret shouldn't interpret the output code
 }
 
 function exec_int($file, $test_num) {
@@ -406,8 +414,6 @@ function nonrecursive_tests() {
     if(!is_file($file)){
       continue;
     }
-      //echo $file, "\n"; 
-    //}
     if ((preg_match("/^\./", $file) == 1) || (preg_match("/\.src$/", $file) != 1)) {    // TODO better to remove this and skip the hidden directories somehow (skip_dots doesn't work)
       continue;
     }
