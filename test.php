@@ -77,9 +77,6 @@ function parse_arg($argv) {
   );
   $options = getopt(NULL, $longopts, $restindex);
 
-  echo "OPTIONS BEFORE CHECK\n";
-  var_dump($options);
-
   if (array_key_exists('help', $options)) {
     print_help();
     if (count($argv) != 2) {
@@ -96,9 +93,6 @@ function parse_arg($argv) {
   check_parse_script();
   check_int_script();
   check_jexampath();
-
-  echo "OPTIONS AFTER CHECK\n";
-  var_dump($options);
 }
 
 
@@ -126,11 +120,11 @@ function generate_html_structure() {
     
     div.tests {width: auto; /*border: 1px solid gray;*/ border-radius: 20px; padding: 20px; margin: 20px; font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;}  
     .one-test {display: flex; border-bottom: solid gray 1px; width: auto; position: center; padding: 5pt; margin: 2pt; font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;}  
-    .test_num {display: inline-block; width: 2%; color: back; margin-left: 2%; margin-right: 1%; font-weight: medium;}
-    .test_stat {display: inline-block; width: 73%; color: black;}
+    .test_num {display: inline-block; width: 2pt; color: back; margin-left: 2%; margin-right: 1%; font-weight: medium;}
+    .test_stat {background-color: red; display: inline-block; width: 73%; color: black;}
     /*.td {margin: 5pt 10pt 0pt 0pt;} */
-    .test_res_p {display: inline-block; width: 7%; color: green; margin-right: 6%; font-size: large; font-weight: medium;}
-    .test_res_f {display: inline-block; width: 7%; color: red; margin-right: 6%; font-size: large; font-weight: medium;}
+    .test_res_PASSED {display: inline-block; width: 7%; color: green; margin-right: 6%; font-size: large; font-weight: medium;}
+    .test_res_FAILED {display: inline-block; width: 7%; color: red; margin-right: 6%; font-size: large; font-weight: medium;}
     header {display: flex;}
   ");
   $head->appendChild($style);
@@ -153,12 +147,10 @@ function generate_html_structure() {
   $header->appendChild($div2);
 }
 
-function html_add_test_summary() {
+function html_summary_structure() {
   $percent = 50;
-  $stat_labels = ["Celkem testů", "Úspěšných", "Neúspěšných"];
-  $stat_values = [900, 899, 1];
-  global $html;
 
+  global $html;
   $body = $html->getElementsByTagName('body')->item(0);
 
   $div1 = $html->createElement("div");
@@ -172,6 +164,23 @@ function html_add_test_summary() {
   $table = $html->createElement("table");
   $div21->appendChild($table);
 
+  $div22 = $html->createElement("div", "$percent%");
+  $div22->setAttribute("class", "percent");
+  $div1->appendChild($div22);
+
+  $div0 = $html->createElement("div");
+  $div0->setAttribute("class", "tests");
+  $body->appendChild($div0);
+
+}
+
+function html_add_test_summary($test_num, $passed, $failed) {
+  global $html;
+  $stat_labels = ["Celkem testů", "Úspěšných", "Neúspěšných"];
+  $stat_values = [$test_num, $passed, $failed];
+  $percent = ($passed/$test_num) * 100;
+ 
+  $table = $html->getElementsByTagName('table')->item(0);
   for ($i=0; $i < 3; $i++) { 
     $test_num = $i;
 
@@ -184,30 +193,18 @@ function html_add_test_summary() {
     $td2 = $html->createElement("td", $stat_values[$i]);
     $tr->appendChild($td2);
   }
-
+  // add percent
+  $div22_old = $html->getElementsByTagName('div')->item(4);
   $div22 = $html->createElement("div", "$percent%");
   $div22->setAttribute("class", "percent");
-  $div1->appendChild($div22);
-
-  $div0 = $html->createElement("div");
-  $div0->setAttribute("class", "tests");
-  $body->appendChild($div0);
+  $div22_old->parentNode->replaceChild($div22, $div22_old);
 }
 
 
-function html_add_test_log(/*$test_num, $test_spec*/) {
-  $test_num = 0;
-  $test_spec_labels = ["Testovaný soubor", "Očekávaný návratový kód", "Skutečný návratový kód", "Výpis na stderr"];
-  $test_spec = ["folder1/folder2/file.txt", "0", "1", "STDERRblah"];
-
-  /*
-  foreach($dom->getElementsByTagName('div') as $div) { 
-        $class = $div->getAttribute('class');
-    }
-    */
-
+function html_add_test_log($test_num, $test_spec, $result) {
   global $html;
-  //$body = $html->childNodes->item(0);
+  $test_spec_labels = ["Testovaný soubor", "Očekávaný návratový kód", "Skutečný návratový kód", "Výpis na stderr"];
+
   $body = $html->getElementsByTagName('div')->item(5);
 
   $div1 = $html->createElement("div");
@@ -237,6 +234,10 @@ function html_add_test_log(/*$test_num, $test_spec*/) {
     $td2 = $html->createElement("td", $test_spec[$i]);
     $tr->appendChild($td2);
     }
+    
+  $div23 = $html->createElement("div", $result);
+  $div23->setAttribute("class", "test_res_$result");
+  $div1->appendChild($div23);
 }
 
 
@@ -287,61 +288,61 @@ function test_setup($test_name) {
  * Function executes the parse-only tests.
  * 
  */
-function exec_parser($file) {
+function exec_parser($file, $test_num) {
   global $options;
+  global $html;
 
-  echo "EXECUTING PARSER TEST\n";
   $script = $options["parse-script"];
 
   // run the parser script
   $output = array();
   $return_val = NULL;
   exec("php8.1 ".$script." <".$file.".src >".$file.".out_parse_tmp", $output, $return_val);
-  echo "return_val: $return_val\n";
 
   // check the return values
-  //echo("diff $file.rc <(echo -n \"$return_val\")"); //<(echo -n "0"
-  //exec("diff $file.rc <(echo -n \"$return_val\")", $output, $return_val); //<(echo -n "0"
-  $rc = fopen($file.".rc_tmp_parse", 'w');// or die('Error opening file: '+$file);
-  echo "$rc\n";
-  $sth = fwrite($rc, $return_val);
-  fclose($rc);
+  $rc_exp = trim(file_get_contents($file.".rc"));
 
-  exec("diff $file.rc $file.rc_tmp_parse", $output, $return_val_diff);
-  if ($return_val_diff == 0) {
-    if ($return_val != 0) {
-      echo "PASSED with return code $return_val\n";
-      return;
-    }
-    // xml compare (.out with .out_tmp_parse)
-    $jexamxml_dir = $options["jexampath"];
-    exec("java -jar $jexamxml_dir"."jexamxml.jar $file.out $file.out_parse_tmp diffs.xml  -D $jexamxml_dir"."options", $output, $return_val_jexamxml);
-    if ($return_val_jexamxml == 0) {
-      echo "PASSED\n";
-    }
+  $test_spec = [$file.".src", $rc_exp, $return_val, "STDERRblah"];
+
+  if ($return_val != $rc_exp) {
+    html_add_test_log($test_num, $test_spec, "FAILED");
+    return 1;
+  }
+  if ($return_val != 0) {
+    html_add_test_log($test_num, $test_spec, "PASSED");
+    return 0;
+  }
+  // xml compare (.out with .out_tmp_parse)
+  $jexamxml_dir = $options["jexampath"];
+  exec("java -jar $jexamxml_dir"."jexamxml.jar $file.out $file.out_parse_tmp diffs.xml  -D $jexamxml_dir"."options", $output, $return_val_jexamxml);
+  if ($return_val_jexamxml == 0) {
+    html_add_test_log($test_num, $test_spec, "PASSED");
+    return 0;
   } else {
-    echo "FAILED\n";
+    html_add_test_log($test_num, $test_spec, "FAILED");
+    return 1;
   }
 }
 
 function exec_int() {
   global $options;
 
-  echo "EXECUTING INT TEST\n";
+  //echo "EXECUTING INT TEST\n";
 
 }
 
 
-function test_exercise($file) {
-  echo "Executing exercise\n";
+function test_exercise($file, $test_num) {
   // parse-only
-  exec_parser($file);
-
+  $failed = exec_parser($file, $test_num);
+  return $failed;
   // int-only
 }
 
 function iterate_the_files() {
   global $options;
+  $test_num = 0;
+  $failed = 0;
   // Construct the iterator
   $it = new RecursiveDirectoryIterator($options['directory'], RecursiveDirectoryIterator::SKIP_DOTS);
 
@@ -352,12 +353,13 @@ function iterate_the_files() {
       continue;
     }
     // .src file
+    $test_num++;
     $test_name = substr($file, 0, strlen($file) - 4);
-    echo $test_name."\n";
+    //echo $test_name."\n";
     test_setup($test_name);
-    test_exercise($test_name);
-
+    $failed += test_exercise($test_name, $test_num);
   }
+  html_add_test_summary($test_num, $test_num - $failed, $failed);
 }
 
 
@@ -365,14 +367,22 @@ function main($argv) {
   parse_arg($argv);
 
   $output = array();
-  //exec('slothcalc', $output, $return_val);
 
+  // generate HTML
+  global $html;
 
-  
+  generate_html_structure();
+  html_summary_structure();
 
   iterate_the_files();
+
+  echo("<!DOCTYPE html>");
+  echo($html->saveHTML());
+
 }
 
+
+$html = new DomDocument();
 main($argv);
 /*
 // generate HTML
