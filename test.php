@@ -288,50 +288,12 @@ function test_setup($test_name) {
   generate_file($test_name, ".rc");
 }
 
-/**
- * Function executes the parse-only tests.
- * 
- */
-function exec_parser($file, $test_num) {
-  global $options;
-  global $html;
-  global $failed;
+function save_parser_html($file, $test_num, $rc_exp, $return_val) {
+  global $html, $failed;
 
-  // run the parser script 
-  $script = $options["parse-script"];
-  $output = array();
-  $return_val = NULL;
-  exec("php8.1 $script <$file.src >$file.out_parse_tmp", $output, $return_val);
-
-  // get the expected return value
-  $rc_exp = trim(file_get_contents($file.".rc"));
-
+  // info that will be written to output HTML
   $test_spec = [$file.".src", $rc_exp, $return_val];
 
-  // parse-only tests are run
-  if (array_key_exists('parse-only', $options)) {
-    if ($return_val != $rc_exp) {
-      // different return values -> FAIL
-      html_add_test_log($test_num, $test_spec, "FAILED");
-      $failed++;
-    } else if ($return_val != 0) {
-      // return values match and are not 0 -> PASS
-      html_add_test_log($test_num, $test_spec, "PASSED");
-    } else {
-      // return values match and are 0 -> compare XML
-      $jexamxml_dir = $options["jexampath"];
-      exec("java -jar $jexamxml_dir"."jexamxml.jar $file.out $file.out_parse_tmp diffs.xml  -D $jexamxml_dir"."options", $output, $return_val_jexamxml);
-      if ($return_val_jexamxml == 0) {
-        // XML files are not different -> PASS
-        html_add_test_log($test_num, $test_spec, "PASSED");
-      } else {
-        // XML files are different -> FAIL
-        html_add_test_log($test_num, $test_spec, "FAILED");
-        $failed++;
-      }
-    }
-    return;
-  }
   // both parser and interpret tests are run
   // parser return value is 0 -> interpret tests can be run
   if ($return_val == 0) {
@@ -347,6 +309,62 @@ function exec_parser($file, $test_num) {
     html_add_test_log($test_num, $test_spec, "PASSED");
   }
   return 1; // indicates that the interpret shouldn't interpret the output code
+}
+
+function save_parser_only_html($file, $test_num, $rc_exp, $return_val) {
+  global $html, $failed, $options;
+
+  // info that will be written to output HTML
+  $test_spec = [$file.".src", $rc_exp, $return_val];
+
+  // parse-only tests are run
+  if ($return_val != $rc_exp) {
+    // different return values -> FAIL
+    html_add_test_log($test_num, $test_spec, "FAILED");
+    $failed++;
+  } else if ($return_val != 0) {
+    // return values match and are not 0 -> PASS
+    html_add_test_log($test_num, $test_spec, "PASSED");
+  } else {
+    // return values match and are 0 -> compare XML
+    $jexamxml_dir = $options["jexampath"];
+    exec("java -jar $jexamxml_dir"."jexamxml.jar $file.out $file.out_parse_tmp diffs.xml  -D $jexamxml_dir"."options", $output, $return_val_jexamxml);
+    if ($return_val_jexamxml == 0) {
+      // XML files are not different -> PASS
+      html_add_test_log($test_num, $test_spec, "PASSED");
+    } else {
+      // XML files are different -> FAIL
+      html_add_test_log($test_num, $test_spec, "FAILED");
+      $failed++;
+    }
+  }
+}
+/**
+ * Function executes the parse-only tests.
+ * 
+ */
+function exec_parser($file, $test_num) {
+  global $options, $html, $failed;
+  //global $html;
+  //global $failed;
+
+  // run the parser script 
+  $script = $options["parse-script"];
+  $output = array();
+  $return_val = NULL;
+  exec("php8.1 $script <$file.src >$file.out_parse_tmp", $output, $return_val);
+
+  // get the expected return value
+  $rc_exp = trim(file_get_contents($file.".rc"));
+
+  // info that will be written to output HTML
+  //$test_spec = [$file.".src", $rc_exp, $return_val];
+
+  if (array_key_exists('parse-only', $options)) {
+    save_parser_only_html($file, $test_num, $rc_exp, $return_val);
+  } else {
+    return save_parser_html($file, $test_num, $rc_exp, $return_val);
+  }
 }
 
 function exec_int($file, $test_num) {
