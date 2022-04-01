@@ -178,7 +178,11 @@ function html_add_test_summary($test_num, $passed, $failed) {
   global $html;
   $stat_labels = ["Celkem testů", "Úspěšných", "Neúspěšných"];
   $stat_values = [$test_num, $passed, $failed];
-  $percent = ($passed/$test_num) * 100;
+  if ($test_num == 0) {
+    $percent = 100;
+  } else {
+    $percent = ($passed/$test_num) * 100;
+  }
  
   $table = $html->getElementsByTagName('table')->item(0);
   for ($i=0; $i < 3; $i++) { 
@@ -291,41 +295,50 @@ function test_setup($test_name) {
 function exec_parser($file, $test_num) {
   global $options;
   global $html;
+  global $failed;
 
   $script = $options["parse-script"];
 
   // run the parser script
   $output = array();
   $return_val = NULL;
-  exec("php8.1 ".$script." <".$file.".src >".$file.".out_parse_tmp", $output, $return_val);
+  exec("php8.1 $script <$file.src >$file.out_parse_tmp", $output, $return_val);
 
   // check the return values
   $rc_exp = trim(file_get_contents($file.".rc"));
 
   $test_spec = [$file.".src", $rc_exp, $return_val, "STDERRblah"];
 
-  if ($return_val != $rc_exp) {
-    html_add_test_log($test_num, $test_spec, "FAILED");
-    return 1;
+  // parse-only
+  if (array_key_exists('parse-only', $options)) {
+    if ($return_val != $rc_exp) {
+      html_add_test_log($test_num, $test_spec, "FAILED");
+      $failed++;
+    } else if ($return_val != 0) {
+      html_add_test_log($test_num, $test_spec, "PASSED");
+    } else {
+      // compare XML
+      $jexamxml_dir = $options["jexampath"];
+      exec("java -jar $jexamxml_dir"."jexamxml.jar $file.out $file.out_parse_tmp diffs.xml  -D $jexamxml_dir"."options", $output, $return_val_jexamxml);
+      if ($return_val_jexamxml == 0) {
+        html_add_test_log($test_num, $test_spec, "PASSED");
+      } else {
+        html_add_test_log($test_num, $test_spec, "FAILED");
+        $failed++;
+      }
+    }
+    return;
   }
+  // both
   if ($return_val != 0) {
-    if (array_key_exists('parse-only', $options)) {
+    if ($return_val != $rc_exp) {
+      html_add_test_log($test_num, $test_spec, "FAILED");
+      $failed++;
+    } else {
       html_add_test_log($test_num, $test_spec, "PASSED");
     }
-    return 0;
-  }
-  // xml compare (.out with .out_tmp_parse)
-  $jexamxml_dir = $options["jexampath"];
-  exec("java -jar $jexamxml_dir"."jexamxml.jar $file.out $file.out_parse_tmp diffs.xml  -D $jexamxml_dir"."options", $output, $return_val_jexamxml);
-  if ($return_val_jexamxml == 0) {
-    if (array_key_exists('parse-only', $options)) {
-      html_add_test_log($test_num, $test_spec, "PASSED");
-    }
-    return 0;
-  } else {
-    html_add_test_log($test_num, $test_spec, "FAILED");
-    return 1;
-  }
+    return 1; // indicates that the interpret shouldn't interpret the output code
+  } // else pokracujeme v interpretu
 }
 
 function exec_int($file, $test_num) {
@@ -343,7 +356,7 @@ function exec_int($file, $test_num) {
   } else {
     exec("python3.8 $script --source=$file.out_parse_tmp --input=$file.in >$file.out_int_tmp", $output, $return_val);
   }
-  
+
   // check the return values
   $rc_exp = trim(file_get_contents($file.".rc"));
 
@@ -368,26 +381,50 @@ function exec_int($file, $test_num) {
   }
 }
 
-
 function test_exercise($file, $test_num) {
   global $options;
   // parse-only
   if (!(array_key_exists('int-only', $options))) {
-    if (($failed = exec_parser($file, $test_num)) == 1 && (!(array_key_exists('parse-only', $options)))) {
-      return 1;
+    if (exec_parser($file, $test_num) == 1) {
+      // do not execute interpret tests - return value of parser os not 0
+      return;
     }
   }
   if (!(array_key_exists('parse-only', $options))) {
-    $failed = exec_int($file, $test_num);
+    exec_int($file, $test_num);
   }
-  return $failed;
 }
 
-function iterate_the_files() {
+function nonrecursive_tests() {
   global $options;
+  global $failed;
   $test_num = 0;
-  $failed = 0;
-  // Construct the iterator
+
+  $fileList = glob($options['directory']."/*");
+
+  foreach($fileList as $file){
+    if(!is_file($file)){
+      continue;
+    }
+      //echo $file, "\n"; 
+    //}
+    if ((preg_match("/^\./", $file) == 1) || (preg_match("/\.src$/", $file) != 1)) {    // TODO better to remove this and skip the hidden directories somehow (skip_dots doesn't work)
+      continue;
+    }
+    $test_num++;
+    $test_name = substr($file, 0, strlen($file) - 4);
+    test_setup($test_name);
+    test_exercise($test_name, $test_num);
+  }
+  html_add_test_summary($test_num, $test_num - $failed, $failed);
+}
+
+function recursive_tests() {
+  global $options;
+  global $failed;
+  $test_num = 0;
+
+  // construct the iterator
   $it = new RecursiveDirectoryIterator($options['directory'], RecursiveDirectoryIterator::SKIP_DOTS);
 
   // Loop through files
@@ -396,12 +433,10 @@ function iterate_the_files() {
     if ((preg_match("/^\./", $it) == 1) || ($file->getExtension() != 'src')) {    // TODO better to remove this and skip the hidden directories somehow (skip_dots doesn't work)
       continue;
     }
-    // .src file
     $test_num++;
     $test_name = substr($file, 0, strlen($file) - 4);
-    //echo $test_name."\n";
     test_setup($test_name);
-    $failed += test_exercise($test_name, $test_num);
+    test_exercise($test_name, $test_num);
   }
   html_add_test_summary($test_num, $test_num - $failed, $failed);
 }
@@ -414,18 +449,24 @@ function main($argv) {
 
   // generate HTML
   global $html;
+  global $options;
 
   generate_html_structure();
   html_summary_structure();
 
-  iterate_the_files();
+  // nonrecursive or recursive testing
+  if (array_key_exists('recursive', $options)) {
+    recursive_tests();
+  } else {
+    nonrecursive_tests();
+  }
 
   echo("<!DOCTYPE html>");
   echo($html->saveHTML());
 
 }
 
-
 $html = new DomDocument();
+$failed = 0;
 main($argv);
 ?>
