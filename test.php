@@ -40,7 +40,7 @@ function check_parse_script() {
 function check_int_script() {
   global $options;
   if (!(array_key_exists('int-script', $options))) {
-    $options['int-script'] = ".interpret.py";
+    $options['int-script'] = "interpret.py";
   }
 }
 
@@ -309,13 +309,57 @@ function exec_parser($file, $test_num) {
     return 1;
   }
   if ($return_val != 0) {
-    html_add_test_log($test_num, $test_spec, "PASSED");
+    if (array_key_exists('parse-only', $options)) {
+      html_add_test_log($test_num, $test_spec, "PASSED");
+    }
     return 0;
   }
   // xml compare (.out with .out_tmp_parse)
   $jexamxml_dir = $options["jexampath"];
   exec("java -jar $jexamxml_dir"."jexamxml.jar $file.out $file.out_parse_tmp diffs.xml  -D $jexamxml_dir"."options", $output, $return_val_jexamxml);
   if ($return_val_jexamxml == 0) {
+    if (array_key_exists('parse-only', $options)) {
+      html_add_test_log($test_num, $test_spec, "PASSED");
+    }
+    return 0;
+  } else {
+    html_add_test_log($test_num, $test_spec, "FAILED");
+    return 1;
+  }
+}
+
+function exec_int($file, $test_num) {
+  global $options;
+  global $html;
+
+  $script = $options["int-script"];
+
+  // run the parser script
+  $output = array();
+  $return_val = NULL;
+  //echo("python 3.8 $script --source=$file.src --input=$file.in >$file.out_int_tmp\n");
+  if (array_key_exists('int-only', $options)) {
+    exec("python3.8 $script --source=$file.src --input=$file.in >$file.out_int_tmp", $output, $return_val);
+  } else {
+    exec("python3.8 $script --source=$file.out_parse_tmp --input=$file.in >$file.out_int_tmp", $output, $return_val);
+  }
+  
+  // check the return values
+  $rc_exp = trim(file_get_contents($file.".rc"));
+
+  $test_spec = [$file.".src", $rc_exp, $return_val, "STDERRblah"];
+
+  if ($return_val != $rc_exp) {
+    html_add_test_log($test_num, $test_spec, "FAILED");
+    return 1;
+  }
+  if ($return_val != 0) {
+    html_add_test_log($test_num, $test_spec, "PASSED");
+    return 0;
+  }
+  // diff compare (.out with .out_tmp_parse)
+  exec("diff $file.out $file.out_int_tmp", $output, $return_val_diff);
+  if ($return_val_diff == 0) {
     html_add_test_log($test_num, $test_spec, "PASSED");
     return 0;
   } else {
@@ -324,19 +368,19 @@ function exec_parser($file, $test_num) {
   }
 }
 
-function exec_int() {
-  global $options;
-
-  //echo "EXECUTING INT TEST\n";
-
-}
-
 
 function test_exercise($file, $test_num) {
+  global $options;
   // parse-only
-  $failed = exec_parser($file, $test_num);
+  if (!(array_key_exists('int-only', $options))) {
+    if (($failed = exec_parser($file, $test_num)) == 1 && (!(array_key_exists('parse-only', $options)))) {
+      return 1;
+    }
+  }
+  if (!(array_key_exists('parse-only', $options))) {
+    $failed = exec_int($file, $test_num);
+  }
   return $failed;
-  // int-only
 }
 
 function iterate_the_files() {
@@ -384,20 +428,4 @@ function main($argv) {
 
 $html = new DomDocument();
 main($argv);
-/*
-// generate HTML
-$html = new DomDocument();
-
-generate_html_structure();
-
-html_add_test_summary();
-
-html_add_test_log();
-html_add_test_log();
-html_add_test_log();
-
-echo("<!DOCTYPE html>");
-echo($html->saveHTML());
-// html_add_div();
-*/
 ?>
