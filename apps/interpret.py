@@ -31,6 +31,9 @@ class Program:
     if name in self._label_dict:
       sys.stderr.write('Label ' + name + ' already exists.\n')
       exit(52)
+      #raise SystemExit('Label ' + name + ' already exists.\n', 52)
+      #sys.stderr.write('Label ' + name + ' already exists.\n')
+      #exit(52)
     self._label_dict[name] = order
 
   # Returns order of the label specified by label_name.
@@ -38,6 +41,7 @@ class Program:
     if not label_name in self._label_dict:
       sys.stderr.write('Label ' + label_name + ' doesn\'t exist.\n')
       exit(52)
+      #raise SystemExit('Label ' + label_name + ' doesn\'t exist.\n', 52)
     return self._label_dict[label_name]
 
   # Returns current instruction order.
@@ -59,6 +63,8 @@ class Program:
     except IndexError:
       sys.stderr.write('Call stack is empty.\n')
       exit(56)
+      #raise SystemExit('Call stack is empty.\n', 56)
+      
 
   # Adds instruction to the instruction dictionary.
   def add_instr(self, order, instr):
@@ -75,44 +81,76 @@ class Program:
     except ValueError:
       sys.stderr.write('Invalid input XML.\n')
       exit(32)
+      #raise SystemExit('Invalid input XML.\n', 32)
+      
 
   # Declares new variable (the type must be 'var').
   # Value and type of the variable is set to None.
   def set_var(self, name_type):
     name, typ = (name_type)
-    frame = self.get_frame(name)
+    try:
+      frame = self.get_frame(name)
+    except SystemExit as ex:
+      sys.stderr.write(ex.args[0])
+      exit(ex.args[1])
     # declare new variable in the frame
-    frame.set_var(name, typ)
+    try:
+      frame.set_var(name, typ)
+    except SystemExit as ex:
+      sys.stderr.write(ex.args[0])
+      exit(ex.args[1])
+    #frame.set_var(name, typ)
 
   # Sets a variable specified by 'name' to (value, type).
   def set_var_value(self, name, value_type):
     value, typ = (value_type)
-    frame = self.get_frame(name)
-    # set the variable 'name' to value and typ
+    #frame = self.get_frame(name)
     try:
+      frame = self.get_frame(name)
+    except SystemExit as ex:
+      sys.stderr.write(ex.args[0])
+      exit(ex.args[1])
+    try:
+      # frame.set_var_value(name, value, typ)
+
+      # second moznost - rovnou oboji
+      # set the variable 'name' to value and typ
+      #self.get_frame(name).set_var_value(name, value, typ)
       frame.set_var_value(name, value, typ)
     except SystemExit as ex:
       sys.stderr.write(ex.args[0])
       exit(ex.args[1])
+      #raise ex
 
   # Returns the value of a variable specified by 'name'.
   def get_var_value(self, name):
-    frame = self.get_frame(name)
+    #frame = self.get_frame(name)
+    try:
+      frame = self.get_frame(name)
+    except SystemExit as ex:
+      sys.stderr.write(ex.args[0])
+      exit(ex.args[1])
     try:
       val = frame.get_var_value(name[3:]) # cut the frame name
     except SystemExit as ex:
+      #raise ex
       sys.stderr.write(ex.args[0])
       exit(ex.args[1])
     return val
 
   # Returns the value and type of a variable specified by 'name'.
   def get_var_value_type(self, name):
-    frame = self.get_frame(name)
+    try:
+      frame = self.get_frame(name)
+    except SystemExit as ex:
+      sys.stderr.write(ex.args[0])
+      exit(ex.args[1])
     try:
       valtype = frame.get_var_value_type(name[3:]) # cut the frame name
     except SystemExit as ex:
       sys.stderr.write(ex.args[0])
       exit(ex.args[1])
+      #raise ex
     return valtype
 
   # Returns frame specified by first two characters in frame_name.
@@ -123,23 +161,31 @@ class Program:
     elif frame_name[0:2] == 'LF':
       # local frame
       if self._lf == None:
-        sys.stderr.write('Uninitialised local frame.\n')
-        exit(55)
+        #sys.stderr.write('Uninitialised local frame.\n')
+        #exit(55)
+        raise SystemExit('Uninitialised local frame.\n', 55)
       return self._lf
     elif frame_name[0:2] == 'TF':
       # temporary frame
       if self._tf == None:
-        sys.stderr.write('Uninitialised temporary frame.\n')
-        exit(55)
+        #sys.stderr.write('Uninitialised temporary frame.\n')
+        #exit(55)
+        raise SystemExit('Uninitialised temporary frame.\n', 55)
       return self._tf
     else:
       # invalid variable name - should not happen in the interpret
-      sys.stderr.write('Invalid variable/frame name.\n')
-      exit(55)
+      #sys.stderr.write('Invalid variable/frame name.\n')
+      #exit(55)
+      raise SystemExit('Invalid variable/frame name.\n', 55)
 
   # Returns frame dictionary.
   def get_frame_dict(self, frame_name):
-    frame = self.get_frame(frame_name)
+    #frame = self.get_frame(frame_name)
+    try:
+      frame = self.get_frame(frame_name)
+    except SystemExit as ex:
+      sys.stderr.write(ex.args[0])
+      exit(ex.args[1])
     return frame.get_frame_dict()
 
   # Creates new temporary frame.
@@ -154,6 +200,7 @@ class Program:
     if self._tf == None:
       sys.stderr.write('Uninitialised temporary frame.\n')
       exit(55)
+      #raise SystemExit('Uninitialised temporary frame.\n', 55)
     # pass the TF reference to LF
     self._lf = self._tf
     self._tf = None
@@ -169,6 +216,7 @@ class Program:
     except IndexError:
       sys.stderr.write('Stack of local frames is empty.\n')
       exit(55)
+      #raise SystemExit('Stack of local frames is empty.\n', 55)
     # set local frame to frame on the top of the stack
     if self._lf_stack:
       self._lf = self._lf_stack[-1] # top
@@ -179,6 +227,7 @@ class Program:
 # Class Frame represents a frame. 
 # It stores variables with its types and values in a frame dictionary.
 class Frame:
+
   # Frame constructor.
   def __init__(self):
     self._frame_dict = {}
@@ -192,13 +241,15 @@ class Frame:
   def set_var(self, name, typ):
     # check if the type is var
     if typ != 'var':
-      sys.stderr.write('Invalid operand type.\n')
-      exit(53)
+      #sys.stderr.write('Invalid operand type.\n')
+      #exit(53)
+      raise SystemExit('Invalid operand type.\n', 53)
     # check if the variable is in the frame dictionary
     name = name[3:]
     if name in self._frame_dict:
-      sys.stderr.write('Redefinition of variable ' + name + '.\n')
-      exit(52)
+      #sys.stderr.write('Redefinition of variable ' + name + '.\n')
+      #exit(52)
+      raise SystemExit('Redefinition of variable ' + name + '.\n', 52)
     # add the variable and set its value and type to None
     self._frame_dict[name] = None
 
@@ -237,197 +288,81 @@ class Frame:
       raise SystemExit('Var ' + name + ' is not declared.\n', 54)
 
 
-# TODO
-#
-class Argument:
-
-  def __init__(self, value, typ):
-    if typ == 'string':
-      if value == None:
-        value = ''
-      else:
-        value = re.sub(r'\\([0-9]{3})', lambda x: chr(int(x[1])), value)
-    self._value = value
-    self._typ = typ
-
-  def set_value(self, val):
-    self._value = val
-
-  def get_value(self):
-    return self._value
-
-  def get_type(self):
-    return self._typ
-
-class Instruction:
-
-  def __init__(self, opcode):
-    self._opcode = opcode
-    self._args = [Argument, Argument, Argument]
-
-  def get_opcode(self):
-    return self._opcode
-
-  def execute(self):
-    pass
-    #print('something default')
-
-  def set_arg(self, arg_num, val, typ):
-    self._args[arg_num - 1] = Argument(val, typ)
-
-  def get_arg_value(self, arg_num):
-    return self._args[arg_num - 1].get_value()
-
-  def get_arg_value_type(self, arg_num):
-    return self._args[arg_num - 1].get_value(), self._args[arg_num - 1].get_type()
-
-
-class Move(Instruction):
-
-  def __init__(self, arg1v, arg1t, arg2v, arg2t):
-    super().__init__("MOVE")
-    self.set_arg(1, arg1v, arg1t)
-    self.set_arg(2, arg2v, arg2t)
-
-  def execute(self):
-    prog.set_var_value(self.get_arg_value(arg_num=1), self.get_arg_value_type(arg_num=2))
-
-    
-class Createframe(Instruction):
-  def __init__(self):
-    super().__init__("CREATEFRAME")
-
-  def execute(self):
-    #vytvori novy TF a zahodi obsah puvodniho TF
-    prog.set_tf_frame()
-
-class Pushframe(Instruction):
-  def __init__(self):
-    super().__init__("PUSHFRAME")
-
-  def execute(self):
-    #print('Executing pushframe.')
-    prog.push_frame()
-
-class Popframe(Instruction):
-  def __init__(self):
-    super().__init__("POPFRAME")
-
-  def execute(self):
-    #print('Executing popframe.')
-    prog.pop_frame()
-
-# class for the DEFVAR instruction
-class Defvar(Instruction):
-  def __init__(self, arg1v, arg1t):
-    super().__init__("DEFVAR")
-    self.set_arg(1, arg1v, arg1t)
-
-  def execute(self):
-    #print('Executing defvar.')
-    # inserts new variable with None value in the frame
-    prog.set_var(self.get_arg_value_type(arg_num=1))
-    
-# class for the CALL instruction
-class Call(Instruction):
-  def __init__(self, arg1v, arg1t):
-    super().__init__("CALL")
-    self.set_arg(1, arg1v, arg1t)
-
-  def execute(self):
-    #print('Executing call.')
-    # save the current position
-    prog.call_stack_push(prog.get_instr_counter())
-    # jump to the label
-    prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
-
-
-class Return(Instruction):
-  def __init__(self):
-    super().__init__("RETURN")
-
-  def execute(self):
-    #print('Executing return.')
-    pos = prog.call_stack_pop()
-    prog.set_instr_counter(pos)
-
-class Pushs(Instruction):
-  def __init__(self, arg1v, arg1t):
-    super().__init__("PUSHS")
-    self.set_arg(1, arg1v, arg1t)
-
-  def execute(self):
-    #print('Executing pushs.')
-    # save to data stack
-    #prog.data_stack_push(self.get_arg_value_type(arg_num=1))
-    # TODO musi zajistit, aby to melo spravny typ pti ukladani na stack
-    stack.operand_stack_push(self.get_arg_value_type(arg_num=1))
-
-class Pops(Instruction):
-  def __init__(self, arg1v, arg1t):
-    super().__init__("POPS")
-    self.set_arg(1, arg1v, arg1t)
-
-  def execute(self):
-    #print('Executing pops.')
-    # check var
-    (name, typ) = self.get_arg_value_type(1)
-    #prog.set_var_value(name, prog.data_stack_pop())
-    prog.set_var_value(name, stack.operand_stack_pop())
-    
+# Class Stack is a singleton. It represents the operand (data) stack.
 class Stack():
-  # sigleton for the operand stack
+
+  # Stack constructor.
   def __init__(self):
     self._operand_stack = []
 
+  # Pushes an operand on the stack.
   def operand_stack_push(self, data):
+    # TODO co treba retezec s escape sekvencemi
+    # TODO co var? Nechat jako var nebo tam dat jeji hodnotu?
     self._operand_stack.append(data)
 
+  # Pops an operand from the stack.
   def operand_stack_pop(self):
     try:
       return self._operand_stack.pop()
     except IndexError:
-      sys.stderr.write('Operand stack is empty.\n')
-      exit(56)
+      raise SystemExit('Operand stack is empty.\n', 56)
 
+  # Returns an operand stack.
   def get_operand_stack(self):
     return self._operand_stack
 
+  # Pops and operand and check if it is an integer type.
   def pop_and_check_int(self):
     # TODO check var typu int: podle tohohle?
-    (op, op_type) = self.operand_stack_pop()
+    try:
+      (op, op_type) = self.operand_stack_pop()
+    except SystemExit as ex:
+      raise ex
     if op_type == 'var':
-      try:  # muze byt None
+      try:  # may be None
         (op, op_type) = prog.get_var_value_type(op)
       except:
-        sys.stderr.write('Variable is not defined.\n')
-        exit(54)
+        #sys.stderr.write('Variable is not defined.\n')
+        #exit(54)
+        raise SystemExit('Variable is not defined.\n', 54)
     if op_type != 'int':
-      sys.stderr.write('Invalid operand type on the operand stack.\n')
-      exit(53)
+      #sys.stderr.write('Invalid operand type on the operand stack.\n')
+      #exit(53)
+      raise SystemExit('Invalid operand type on the operand stack.\n', 53)
     try:
       op = int(op)
     except ValueError:
-      sys.stderr.write('Invalid operand type on the operand stack.\n')
-      exit(53)
+      #sys.stderr.write('Invalid operand type on the operand stack.\n')
+      #exit(53)
+      raise SystemExit('Invalid operand type on the operand stack.\n', 53)
     return op
 
+  # Pops two operands from the stack and checks if their types are equal.
   def pop_2_check_types_eq(self):
     (val2, typ2) = self.operand_stack_pop()
     (val1, typ1) = self.operand_stack_pop()
     # TODO pridano - check, jestli to funguje ok
+    # if the operand is a variable -> get its value
     if typ1 == 'var':
-      try:  # muze byt None
+      try:  
         (val1, typ1) = prog.get_var_value_type(val1)
-      except:
+      except TypeError:  # NoneType -> variable is not defined
         sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+        exit(56)
+      except SystemExit as ex:  # variable is not declared
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
     if typ2 == 'var':
-      try:  # muze byt None
+      try:
         (val1, typ1) = prog.get_var_value_type(val1)
-      except:
+      except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
-        exit(54)
+        exit(56)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+    # check types equality
     if typ1 == typ2 == 'int':
       try:
         val1 = int(val1)
@@ -444,7 +379,10 @@ class Stack():
         exit(53) 
     elif typ1 == 'nil' or typ2 == 'nil':
       pass
+    # TODO myslim, ze tady taky staci jenom pass -> uz ukladam bool promenne spravne
     elif typ1 == typ2 == 'bool':
+      pass
+      """
       if val1.upper() == 'TRUE':
         val1 = True
       else:
@@ -453,321 +391,135 @@ class Stack():
         val2 = True
       else:
         val2 = False
+      """
     else:
       sys.stderr.write('Wrong operand type on the operand stack.\n')
       exit(53)
     return (val1, val2, typ1, typ2)
 
-class Clears(Instruction):
-  def __init__(self):
-      super().__init__("CLEARS")
 
-  def execute(self):
-    stack.get_operand_stack().clear()
+# Class Argument represents an argument of the opcode.
+# It has its value and type.
+class Argument:
 
-class Adds(Instruction):
-  def __init__(self):
-      super().__init__("ADDS")
+  # Argument contructor.
+  def __init__(self, value, typ):
+    if typ == 'string':
+      # check empty string
+      if value == None:
+        value = ''
+      # convert escape sequences
+      else:
+        value = re.sub(r'\\([0-9]{3})', lambda x: chr(int(x[1])), value)
+    self._value = value
+    self._typ = typ
 
-  def execute(self):
-    op2 = stack.pop_and_check_int()
-    op1 = stack.pop_and_check_int()
-    result = op1 + op2
-    stack.operand_stack_push((result, 'int'))
+  # Sets the value. 
+  def set_value(self, val):
+    self._value = val
 
-class Subs(Instruction):
-  def __init__(self):
-      super().__init__("SUBS")
+  # Returns the value.
+  def get_value(self):
+    return self._value
 
-  def execute(self):
-    op2 = stack.pop_and_check_int()
-    op1 = stack.pop_and_check_int()
-    result = op1 - op2
-    stack.operand_stack_push((result, 'int'))
+  # Returns the type.
+  def get_type(self):
+    return self._typ
 
-class Muls(Instruction):
-  def __init__(self):
-      super().__init__("MULS")
+# Class Instruction represents the opcode. 
+# It has its name and an array of arguments.
+class Instruction:
+  # Instruction constructor.
+  def __init__(self, opcode):
+    self._opcode = opcode
+    self._args = [Argument, Argument, Argument]
 
-  def execute(self):
-    op2 = stack.pop_and_check_int()
-    op1 = stack.pop_and_check_int()
-    result = op1 * op2
-    stack.operand_stack_push((result, 'int'))
+  # Returns the name of the instruction (opcode).
+  def get_opcode(self):
+    return self._opcode
 
-class Idivs(Instruction):
-  def __init__(self):
-      super().__init__("IDIVS")
+  # Sets the name and type to the argument specified by arg_num.
+  def set_arg(self, arg_num, val, typ):
+    self._args[arg_num - 1] = Argument(val, typ)
 
-  def execute(self):
-    op2 = stack.pop_and_check_int()
-    op1 = stack.pop_and_check_int()
-    try:
-      result = op1 // op2
-    except ZeroDivisionError:
-      sys.stderr.write('IDIVS: Division by zero.\n')
-      exit(57)
-    stack.operand_stack_push((result, 'int'))
+  # Returns value of the argument.
+  def get_arg_value(self, arg_num):
+    return self._args[arg_num - 1].get_value()
 
-class Lts(Instruction):
-  def __init__(self):
-      super().__init__("LTS")
+  # Returns value and type of the argument as a tuple (value, type).
+  def get_arg_value_type(self, arg_num):
+    return self._args[arg_num - 1].get_value(), self._args[arg_num - 1].get_type()
 
-  def execute(self):
-    (val1, val2, typ1, typ2) = stack.pop_2_check_types_eq()
-    if typ1 == 'nil' or typ2 == 'nil':
-      sys.stderr.write(self.get_opcode() + ': wrong operand type on the operand stack.\n')
-      exit(53)
-    result = val1 < val2
-    #prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
-    stack.operand_stack_push((result, 'bool'))
 
-class Gts(Instruction):
-  def __init__(self):
-      super().__init__("LTS")
-
-  def execute(self):
-    (val1, val2, typ1, typ2) = stack.pop_2_check_types_eq()
-    if typ1 == 'nil' or typ2 == 'nil':
-      sys.stderr.write(self.get_opcode() + ': wrong operand type on the operand stack.\n')
-      exit(53)
-    result = val1 > val2
-    #prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
-    stack.operand_stack_push((result, 'bool'))
-
-class Eqs(Instruction):
-  def __init__(self):
-      super().__init__("LTS")
-
-  def execute(self):
-    (val1, val2, typ1, typ2) = stack.pop_2_check_types_eq()
-    result = False
-    if (typ1 == 'nil' and typ2 == 'nil') or val1 == val2:
-      result = True
-    #prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
-    stack.operand_stack_push((result, 'bool'))
-
-    #----------------------------------------------------------------------------------------
-
-class Ands(Instruction):
-  def __init__(self):
-    super().__init__("ANDS")
-
-  def execute(self):
-    (val1, val2, typ1, typ2) =  stack.pop_2_check_types_eq()
-    if typ1 != 'bool' and typ2 != 'bool':
-      sys.stderr.write('ANDS: wrong operand type on the operand stack.\n')
-      exit(53)
-    result = val1 and val2
-    stack.operand_stack_push((result, 'bool'))
-
-class Ors(Instruction):
-  def __init__(self):
-    super().__init__("ORS")
-
-  def execute(self):
-    (val1, val2, typ1, typ2) =  stack.pop_2_check_types_eq()
-    if typ1 != 'bool' and typ2 != 'bool':
-      sys.stderr.write('ORS: wrong operand type on the operand stack.\n')
-      exit(53)
-    result = val1 or val2
-    stack.operand_stack_push((result, 'bool'))
-
-class Nots(Instruction):
-  def __init__(self):
-    super().__init__("NOTS")
-
-  def execute(self):
-    (val, typ) = stack.operand_stack_pop()
-    if typ != 'bool':
-      sys.stderr.write('NOTS: wrong operand type on the operand stack.\n')
-      exit(53)
-    val_bool = False
-    if val.upper() == 'TRUE':
-      val_bool = True
-    result = not val_bool
-    stack.operand_stack_push((result, 'bool'))
-
-class Int2chars(Instruction):
-  def __init__(self):
-    super().__init__("INT2CHARS")
-
-  def execute(self):
-    (val, typ) = stack.operand_stack_pop()
-    #(val, typ) = self.get_arg_value_type(arg_num=2)
-    if typ == 'var':
-      try:  # muze byt None
-        (val, typ) = prog.get_var_value_type(val)
-      except:
-        sys.stderr.write('Variable is not defined.\n')
-        exit(54)
-    if typ != 'int':
-      sys.stderr.write('INT2CHARS: Invalid integer value.\n')
-      exit(58)
-    try:
-      result = chr(int(val))
-    except:
-      sys.stderr.write('INT2CHARS: Invalid integer value.\n')
-      exit(58)
-    stack.operand_stack_push((result, 'string'))
-    #prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'string'))
-
-class Stri2ints(Instruction):
-  def __init__(self):
-    super().__init__("STRI2INTS")
-
-  def execute(self):
-    # TODO osetrit None?
-    val2 = stack.pop_and_check_int()
-    (val1, typ1) = stack.operand_stack_pop()
-    
-    if typ1 == 'var':
-      try:  # muze byt None
-        (val1, typ1) = prog.get_var_value_type(val1)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
-    if typ1 != 'string':
-      sys.stderr.write('STRI2INTS: Invalid operand type.\n')
-      exit(53)
-    try:
-      result = ord(val1[val2])
-    except:
-      sys.stderr.write('STRI2INTS: Index out of range.\n')
-      exit(58)
-    # TypeError exception if invalid chr()?
-    #prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
-    stack.operand_stack_push((result, 'int'))
-
-class Jumpifeqs(Instruction):
-
-  def __init__(self, arg1v, arg1t):
-    super().__init__("JUMPIFEQS")
-    self.set_arg(1, arg1v, arg1t)
-
-  def execute(self):
-    # zmena rizeni toku programu
-    (symb2_val, symb2_typ) = stack.operand_stack_pop()
-    (symb1_val, symb1_typ) = stack.operand_stack_pop()
-    
-    if symb1_typ == 'var':
-      try:  # muze byt None
-        (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
-    if symb2_typ == 'var':
-      try:  # muze byt None
-        (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
-    if symb1_typ == symb2_typ:
-      if symb1_typ == 'int':
-        try:
-          symb1_val = int(symb1_val)
-          symb2_val = int(symb2_val)
-        except TypeError:
-          sys.stderr.write('JUMPIFEQS: wrong operand type.\n')
-          exit(32)
-      if symb1_val == symb2_val:
-        prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
-    elif symb1_typ == 'nil' or symb2_typ == 'nil':
-      #print('Not sure co s tim nilem')
-      if symb1_typ == symb2_typ:
-        prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
-    else:
-      sys.stderr.write('JUMPIFEQS: wrong operand type.\n')
-      exit(53)
-
-class Jumpifneqs(Instruction):
-  def __init__(self, arg1v, arg1t):
-    super().__init__("JUMPIFNEQS")
-    self.set_arg(1, arg1v, arg1t)
-
-  def execute(self):
-    # zmena rizeni toku programu
-    #print('Executing jump.')
-    (symb2_val, symb2_typ) = stack.operand_stack_pop()
-    (symb1_val, symb1_typ) = stack.operand_stack_pop()
-    
-    if symb1_typ == 'var':
-      try:  # muze byt None
-        (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
-    if symb2_typ == 'var':
-      try:  # muze byt None
-        (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
-    if symb1_typ == symb2_typ:
-      if symb1_typ == 'int':
-        try:
-          symb1_val = int(symb1_val)
-          symb2_val = int(symb2_val)
-        except TypeError:
-          sys.stderr.write('JUMPIFNEQS: wrong operand type.\n')
-          exit(32)
-      if symb1_val != symb2_val:
-        prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
-    elif symb1_typ == 'nil' or symb2_typ == 'nil':
-      #print('Not sure co s tim nilem')
-      if symb1_typ != symb2_typ:
-        prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
-    else:
-      sys.stderr.write('JUMPIFNEQS: wrong operand type.\n')
-      exit(53)
-
-    #----------------------------------------------------------------------------------------
-
+# Class Arithmetic is inherited from Instruction class.
+# It is used for arithmetic instructions - ADD, MUL etc
+# All arithmetic instructions have three operands.
 class Arithmetic(Instruction):
+
+  # Arithmetic instruction constructor.
   def __init__(self, opcode, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__(opcode)
     self.set_arg(1, arg1v, arg1t)
     self.set_arg(2, arg2v, arg2t)
     self.set_arg(3, arg3v, arg3t)
 
+  # Checks if the operand is integer and returns it.
   def get_check_int_operand(self, arg_num):
-    # checks if the operand is int and returns it
     (val, typ) = self.get_arg_value_type(arg_num=arg_num)
+    # if the argument is variable -> get its value and type
     if typ == 'var':
       try:
         var_name = val
         (val, typ) = prog.get_var_value_type(val)
-      except TypeError:
-        # TODO vypsat nil nebo error?
+        """
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+        """
+      except TypeError:   # variable is not defined (exit 56)
         sys.stderr.write('Variable ' + var_name + ' is not defined.\n')
-        exit(54)
+        exit(56)
+    # check integer type
     if typ != 'int':
       sys.stderr.write(self.get_opcode() + ': wrong argument type.\n')
       exit(53)
+    # cast the value to integer
     try:
       val = int(val)
-    except ValueError:
+    except ValueError: # invalid input XML
       sys.stderr.write(self.get_opcode() + ': wrong argument type.\n')
-      exit(32)  # or 53?
+      exit(32)  # TODO or 53?
     return val
 
+  # Checks if two operands have equal type and returns them.
   def check_operand_type_eq(self):
-    # return (val1, val2, typ)
+    # get operands types and values
     (val1, typ1) = self.get_arg_value_type(arg_num=2)
     (val2, typ2) = self.get_arg_value_type(arg_num=3)
-    # TODO pridano - check, jestli to funguje ok
+    # if the operand is variable -> get its value and type
     if typ1 == 'var':
-      try:  # muze byt None
+      try:
         (val1, typ1) = prog.get_var_value_type(val1)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+        """
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+        """
+      except TypeError:   # variable is not defined (exit 56)
+        sys.stderr.write(self.get_opcode() + ': Variable is not defined.\n')
+        exit(56)
     if typ2 == 'var':
       try:  # muze byt None
         (val1, typ1) = prog.get_var_value_type(val1)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+        """
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+        """
+      except TypeError:   # variable is not defined (exit 56)
+        sys.stderr.write(self.get_opcode() + ': Variable is not defined.\n')
+        exit(56)
+    # check types equality
     if typ1 == typ2 == 'int':
       try:
         val1 = int(val1)
@@ -787,6 +539,9 @@ class Arithmetic(Instruction):
         sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
         exit(53)
     elif typ1 == typ2 == 'bool':
+      pass
+      # TODO - uz by mely byl ulozene spravne
+      """
       if val1.upper() == 'TRUE':
         val1 = True
       else:
@@ -795,16 +550,485 @@ class Arithmetic(Instruction):
         val2 = True
       else:
         val2 = False
+      """
     else:
       sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
       exit(53)
     return (val1, val2, typ1)
 
+# Class Move represents MOVE instruction.
+class Move(Instruction):
 
+  # Move constructor.
+  def __init__(self, arg1v, arg1t, arg2v, arg2t):
+    super().__init__("MOVE")
+    self.set_arg(1, arg1v, arg1t)
+    self.set_arg(2, arg2v, arg2t)
+
+  # Moves the value in arg_num=2 to arg_num=1.
+  def execute(self):
+    prog.set_var_value(self.get_arg_value(arg_num=1), self.get_arg_value_type(arg_num=2))
+
+# Class Createframe represents CREATEFRAME instruction.
+class Createframe(Instruction):
+  
+  # Createframe constructor.
+  def __init__(self):
+    super().__init__("CREATEFRAME")
+
+  # Creates an empty temporary frame.
+  def execute(self):
+    prog.set_tf_frame()
+
+# Class Pushframe represents PUSHFRAME instruction.
+class Pushframe(Instruction):
+
+  # Pushframe constructor.
+  def __init__(self):
+    super().__init__("PUSHFRAME")
+
+  # Pushes temporary frame on the stack of local frames.
+  def execute(self):
+    prog.push_frame()
+
+# Class Popframe represents POPFRAME instruction.
+class Popframe(Instruction):
+
+  # Popframe constructor.
+  def __init__(self):
+    super().__init__("POPFRAME")
+
+  # Pops frame from the stack of local frames.
+  # Popped frame becomes temporary frame.
+  def execute(self):
+    prog.pop_frame()
+
+# Class Defvar represents DEFVAR instruction.
+class Defvar(Instruction):
+
+  # Defvar constructor.
+  def __init__(self, arg1v, arg1t):
+    super().__init__("DEFVAR")
+    self.set_arg(1, arg1v, arg1t)
+
+  # Declares a new variable with None value.
+  def execute(self):
+    # TODO zkusit exceptions - jestli se to fakt ukonci nebo ne
+    prog.set_var(self.get_arg_value_type(arg_num=1))
+    
+# Class Call represents CALL instruction.
+class Call(Instruction):
+
+  # Call constructor.
+  def __init__(self, arg1v, arg1t):
+    super().__init__("CALL")
+    self.set_arg(1, arg1v, arg1t)
+
+  # Sets instruction counter to new position (specified by label).
+  def execute(self):
+    # push the current position to the call stack
+    prog.call_stack_push(prog.get_instr_counter())
+    # jump to the label
+    prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
+
+# Class Return represents RETURN instruction.
+class Return(Instruction):
+
+  # Return constructor.
+  def __init__(self):
+    super().__init__("RETURN")
+
+  # Sets instruction counter to the previous position (popped from the call stack).
+  def execute(self):
+    pos = prog.call_stack_pop()
+    prog.set_instr_counter(pos)
+
+# Class Pushs represents PUSHS instruction.
+class Pushs(Instruction):
+
+  # Pushs constructor.
+  def __init__(self, arg1v, arg1t):
+    super().__init__("PUSHS")
+    self.set_arg(1, arg1v, arg1t)
+
+  # Pushes an operand to the operand stack.
+  def execute(self):
+    # TODO musi zajistit, aby to melo spravny typ pti ukladani na stack
+    stack.operand_stack_push(self.get_arg_value_type(arg_num=1))
+
+# Class Pops represents POPS instruction.
+class Pops(Instruction):
+
+  # Pops constructor.
+  def __init__(self, arg1v, arg1t):
+    super().__init__("POPS")
+    self.set_arg(1, arg1v, arg1t)
+
+  # Pops an operand from the operand stack and stores it in a variable.
+  def execute(self):
+    (name, typ) = self.get_arg_value_type(arg_num=1)
+    prog.set_var_value(name, stack.operand_stack_pop())
+    
+# Class Clears represents CLEARS instruction.
+class Clears(Instruction):
+
+  # Clears constructor.
+  def __init__(self):
+      super().__init__("CLEARS")
+
+  # Clears the operand stack.
+  def execute(self):
+    stack.get_operand_stack().clear()
+
+# Class Adds represents ADDS instruction.
+class Adds(Instruction):
+
+  # Adds constructor.
+  def __init__(self):
+      super().__init__("ADDS")
+
+  # TODO check co exceptions - jestli se ukonci program nebo je mam odchytit tady
+  # Pops two operands from the operand stack, adds them
+  # and pushes them back to the stack.
+  def execute(self):
+    op2 = stack.pop_and_check_int()
+    op1 = stack.pop_and_check_int()
+    result = op1 + op2
+    stack.operand_stack_push((result, 'int'))
+
+# Class Subs represents SUBS instruction.
+class Subs(Instruction):
+
+  # Subs constructor.
+  def __init__(self):
+      super().__init__("SUBS")
+
+  # Pops two operands from the operand stack, subtracts them
+  # and pushes them back to the stack.
+  def execute(self):
+    op2 = stack.pop_and_check_int()
+    op1 = stack.pop_and_check_int()
+    result = op1 - op2
+    stack.operand_stack_push((result, 'int'))
+
+# Class Muls represents MULS instruction.
+class Muls(Instruction):
+
+  # Muls constructor.
+  def __init__(self):
+      super().__init__("MULS")
+
+  # Pops two operands from the operand stack, multiplies them
+  # and pushes them back to the stack.
+  def execute(self):
+    op2 = stack.pop_and_check_int()
+    op1 = stack.pop_and_check_int()
+    result = op1 * op2
+    stack.operand_stack_push((result, 'int'))
+
+# Class Idivs represents IDIVS instruction.
+class Idivs(Instruction):
+
+  # Idivs constructor.
+  def __init__(self):
+      super().__init__("IDIVS")
+
+  # Pops two operands from the operand stack, executes integer division
+  # and pushes them back to the stack.
+  def execute(self):
+    op2 = stack.pop_and_check_int()
+    op1 = stack.pop_and_check_int()
+    try:
+      result = op1 // op2
+    except ZeroDivisionError:
+      sys.stderr.write('IDIVS: Division by zero.\n')
+      exit(57)
+    stack.operand_stack_push((result, 'int'))
+
+# Class Lts represents LTS instruction.
+class Lts(Instruction):
+
+  # Lts constructor.
+  def __init__(self):
+      super().__init__("LTS")
+
+  # Pops two operands from the operand stack, checks if the first operand is lower
+  # than the second one and pushes the boolean result back to the stack.
+  def execute(self):
+    (val1, val2, typ1, typ2) = stack.pop_2_check_types_eq()
+    # nil is not supported in GTS operation
+    if typ1 == 'nil' or typ2 == 'nil':
+      sys.stderr.write(self.get_opcode() + ': wrong operand type on the operand stack.\n')
+      exit(53)
+    result = val1 < val2
+    stack.operand_stack_push((result, 'bool'))
+
+# Class Gts represents GTS instruction.
+class Gts(Instruction):
+
+  # Gts constructor.
+  def __init__(self):
+      super().__init__("LTS")
+
+  # Pops two operands from the operand stack, checks if the first operand is greater
+  # than the second one and pushes the boolean result back to the stack.
+  def execute(self):
+    (val1, val2, typ1, typ2) = stack.pop_2_check_types_eq()
+    # nil is not supported in GTS operation
+    if typ1 == 'nil' or typ2 == 'nil':
+      sys.stderr.write(self.get_opcode() + ': wrong operand type on the operand stack.\n')
+      exit(53)
+    result = val1 > val2
+    stack.operand_stack_push((result, 'bool'))
+
+# Class Eqs represents EQS instruction.
+class Eqs(Instruction):
+
+  # Eqs constructor.
+  def __init__(self):
+      super().__init__("LTS")
+
+  # Pops two operands from the operand stack, checks if they are equal
+  # and pushes the boolean result back to the stack.
+  def execute(self):
+    (val1, val2, typ1, typ2) = stack.pop_2_check_types_eq()
+    result = False
+    if (typ1 == 'nil' and typ2 == 'nil') or val1 == val2:
+      result = True
+    stack.operand_stack_push((result, 'bool'))
+
+# Class Ands represents ANDS instruction.
+class Ands(Instruction):
+
+  # Ands constructor.
+  def __init__(self):
+    super().__init__("ANDS")
+
+  # Pops two operands from the operand stack, executes and operation
+  # and pushes the boolean result back to the stack.
+  def execute(self):
+    (val1, val2, typ1, typ2) =  stack.pop_2_check_types_eq()
+    if typ1 != 'bool' and typ2 != 'bool':
+      sys.stderr.write('ANDS: wrong operand type on the operand stack.\n')
+      exit(53)
+    result = val1 and val2
+    stack.operand_stack_push((result, 'bool'))
+
+# Class Ors represents ORS instruction.
+class Ors(Instruction):
+
+  # Ors constructor.
+  def __init__(self):
+    super().__init__("ORS")
+
+  # Pops two operands from the operand stack, executes or operation
+  # and pushes the boolean result back to the stack.
+  def execute(self):
+    (val1, val2, typ1, typ2) =  stack.pop_2_check_types_eq()
+    if typ1 != 'bool' and typ2 != 'bool':
+      sys.stderr.write('ORS: wrong operand type on the operand stack.\n')
+      exit(53)
+    result = val1 or val2
+    stack.operand_stack_push((result, 'bool'))
+
+# Class Nots represents NOTS instruction.
+class Nots(Instruction):
+
+  # Nots constructor.
+  def __init__(self):
+    super().__init__("NOTS")
+
+  # Pops an operand from the operand stack, executes not operation
+  # and pushes the boolean result back to the stack.
+  def execute(self):
+    (val, typ) = stack.operand_stack_pop()
+    if typ != 'bool':
+      sys.stderr.write('NOTS: wrong operand type on the operand stack.\n')
+      exit(53)
+    # TODO check jestli to nevyhazuje vyjimku - pokud
+    # je mam uz na stacku ulozene spravne, melo by toto byt nepotrebne
+    # TODO check jestli je ukladam na stack spravne a mozna pridat 'pretypovani'
+    # uz do ukladani argumentu v Instruction/Argument class
+    val_bool = False
+    if val.upper() == 'TRUE':
+      val_bool = True
+    result = not val_bool
+    stack.operand_stack_push((result, 'bool'))
+
+# Class Int2chars represents INT2CHARS instruction.
+class Int2chars(Instruction):
+
+  # Int2chars constructor.
+  def __init__(self):
+    super().__init__("INT2CHARS")
+
+  # Pops an operand from the stack, checks if it is an integer, 
+  # gets its character value and pushes the value back on the stack.
+  # TODO check jestli vubec na operand stack davam variables nebo rovnou jejich hodnoty
+  def execute(self):
+    (val, typ) = stack.operand_stack_pop()
+    if typ == 'var':
+      try:
+        (val, typ) = prog.get_var_value_type(val)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
+    # check integer type
+    if typ != 'int':
+      sys.stderr.write('INT2CHARS: Invalid integer value.\n')
+      exit(58)
+    try:  # get the character value
+      result = chr(int(val))
+    except: # not a valid value
+      sys.stderr.write('INT2CHARS: Invalid value.\n')
+      exit(58)
+    stack.operand_stack_push((result, 'string'))
+
+# Class Stri2ints represents STRI2INTS instruction.
+class Stri2ints(Instruction):
+
+  # Stri2ints constructor.
+  def __init__(self):
+    super().__init__("STRI2INTS")
+
+  # Pops two operands from the operand stack. Check if the symb2 is integer
+  # and symb1 string. Gets the character on index specified by symb2, 
+  # converts it to its ordinal value and pushes the result back to the stack.
+  def execute(self):
+    # TODO check jestli mam spravne poradi
+    val2 = stack.pop_and_check_int()  # check if the operand is integer
+    (val1, typ1) = stack.operand_stack_pop()
+    if typ1 == 'var':
+      try:
+        (val1, typ1) = prog.get_var_value_type(val1)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
+    if typ1 != 'string':
+      sys.stderr.write('STRI2INTS: Invalid operand type.\n')
+      exit(53)
+    try:
+      result = ord(val1[val2])
+    except:
+      sys.stderr.write('STRI2INTS: Index out of range.\n')
+      exit(58)
+    stack.operand_stack_push((result, 'int'))
+
+# Class Jumpifeqs represents JUMPIFEQS instruction.
+class Jumpifeqs(Instruction):
+
+  # Jumpifeqs constructor.
+  def __init__(self, arg1v, arg1t):
+    super().__init__("JUMPIFEQS")
+    self.set_arg(1, arg1v, arg1t)
+
+  # Pops two operands from the operand stack, checks if they are equal
+  # and if they are, jumps to the label specified by arg1.
+  def execute(self):
+    (symb2_val, symb2_typ) = stack.operand_stack_pop()
+    (symb1_val, symb1_typ) = stack.operand_stack_pop()
+    # if the symbol is a variable, get its value and type
+    if symb1_typ == 'var':
+      try:
+        (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
+    if symb2_typ == 'var':
+      try:
+        (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
+    # check if the symbols are equal
+    if symb1_typ == symb2_typ:
+      if symb1_typ == 'int':
+        try:
+          symb1_val = int(symb1_val)
+          symb2_val = int(symb2_val)
+        except TypeError:
+          sys.stderr.write('JUMPIFEQS: wrong operand type.\n')
+          exit(32)
+      if symb1_val == symb2_val:
+        prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
+    elif symb1_typ == 'nil' or symb2_typ == 'nil':
+      if symb1_typ == symb2_typ:
+        prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
+    else:
+      sys.stderr.write('JUMPIFEQS: wrong operand type.\n')
+      exit(53)
+
+# Class Jumpifneqs represents JUMPIFNEQS instruction.
+class Jumpifneqs(Instruction):
+
+  # Jumpifneqs constructor.
+  def __init__(self, arg1v, arg1t):
+    super().__init__("JUMPIFNEQS")
+    self.set_arg(1, arg1v, arg1t)
+
+  # Pops two operands from the operand stack, checks if they are equal
+  # and if they are not equal, jumps to the label specified by arg1.
+  def execute(self):
+    (symb2_val, symb2_typ) = stack.operand_stack_pop()
+    (symb1_val, symb1_typ) = stack.operand_stack_pop()
+    # if the symbol is a variable, get its value and type
+    if symb1_typ == 'var':
+      try:
+        (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
+    if symb2_typ == 'var':
+      try:
+        (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
+    # check if the operands are equal
+    if symb1_typ == symb2_typ:
+      if symb1_typ == 'int':
+        try:
+          symb1_val = int(symb1_val)
+          symb2_val = int(symb2_val)
+        except TypeError:
+          sys.stderr.write('JUMPIFNEQS: wrong operand type.\n')
+          exit(32)
+      if symb1_val != symb2_val:
+        prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
+    elif symb1_typ == 'nil' or symb2_typ == 'nil':
+      #print('Not sure co s tim nilem')
+      if symb1_typ != symb2_typ:
+        prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
+    else:
+      sys.stderr.write('JUMPIFNEQS: wrong operand type.\n')
+      exit(53)
+
+# Class Add represents ADD instruction.
 class Add(Arithmetic):
+
+  # Add constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("ADD", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
+  # Adds two integer values and stores the result in variable specified by arg1.
   def execute(self):
     # get and check the operands
     val1 = super().get_check_int_operand(arg_num=2)
@@ -812,30 +1036,42 @@ class Add(Arithmetic):
     result = val1 + val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
 
+# Class Sub represents SUB instruction.
 class Sub(Arithmetic):
+
+  # Sub constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("SUB", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
+  # Substracts two integer values and stores the result in variable specified by arg1.
   def execute(self):
     val1 = super().get_check_int_operand(arg_num=2)
     val2 = super().get_check_int_operand(arg_num=3)
     result = val1 - val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
 
+# Class Mul representas MUL instruction.
 class Mul(Arithmetic):
+
+  # Mul constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("MUL", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
+  # Multiplies two integer values and stores the result in variable specified by arg1.
   def execute(self):
     val1 = super().get_check_int_operand(arg_num=2)
     val2 = super().get_check_int_operand(arg_num=3)
     result = val1 * val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
 
+# Class Idiv represents IDIV istruction.
 class Idiv(Arithmetic):
+
+  # Idiv constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("IDIV", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
+  # Divides two integer values and stores the result in variable specified by arg1.
   def execute(self):
     val1 = super().get_check_int_operand(arg_num=2)
     val2 = super().get_check_int_operand(arg_num=3)
@@ -846,27 +1082,32 @@ class Idiv(Arithmetic):
       exit(57)
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
 
+# Class Lt represents LT istruction.
 class Lt(Arithmetic):
+
+  # Lt constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("LT", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
+  # Checks if arg2 value is lower than arg2 value and stores the boolean
+  # result in variable specified by arg1.
   def execute(self):
     (val1, val2, typ) = super().check_operand_type_eq()
     if typ == 'nil':
       sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
       exit(53)
-    """
-    result = 'false'
-    if val1 < val2:
-      result = 'true'
-    """
     result = val1 < val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
+# Class Gt represents GT instruction.
 class Gt(Arithmetic):
+
+  # Gt constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("GT", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
+  # Checks if arg2 value is greater than arg2 value and stores the boolean
+  # result in variable specified by arg1.
   def execute(self):
     (val1, val2, typ) = super().check_operand_type_eq()
     if typ == 'nil':
@@ -875,10 +1116,15 @@ class Gt(Arithmetic):
     result = val1 > val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
+# Class Eq represents EQ instruction.
 class Eq(Arithmetic):
+
+  # Eq constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("EQ", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
+  # Checks if arg2 value equals arg2 value and stores the boolean
+  # result in variable specified by arg1.
   def execute(self):
     (val1, val2, typ) = super().check_operand_type_eq()
     result = False
@@ -886,10 +1132,15 @@ class Eq(Arithmetic):
       result = True
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
+# Class And represents AND instruction.
 class And(Arithmetic):
+
+  # And constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("AND", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
+  # Checks if the operands are booleans and executes and operation.
+  # Boolean result is stored in a variable specified by arg1.
   def execute(self):
     (val1, val2, typ) = super().check_operand_type_eq()
     if typ != 'bool':
@@ -898,10 +1149,15 @@ class And(Arithmetic):
     result = val1 and val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
+# Class Or represents OR instruction.
 class Or(Arithmetic):
+
+  # Or constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("OR", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
+  # Checks if the operands are booleans and executes or operation.
+  # Boolean result is stored in a variable specified by arg1.
   def execute(self):
     (val1, val2, typ) = super().check_operand_type_eq()
     if typ != 'bool':
@@ -910,12 +1166,17 @@ class Or(Arithmetic):
     result = val1 or val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
+# Class Not represents NOT instruction.
 class Not(Instruction):
+
+  # Not constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t):
     super().__init__("NOT")
     self.set_arg(1, arg1v, arg1t)
     self.set_arg(2, arg2v, arg2t)
 
+  # Checks if the operand is boolean and executes not operation.
+  # Boolean result is stored in a variable specified by arg1.
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=2)
     if typ != 'bool':
@@ -927,122 +1188,143 @@ class Not(Instruction):
     result = not val_bool
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
+# Class represents INT2CHAR instruction.
 class Int2char(Instruction):
+
+  # Int2char constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t):
     super().__init__("INT2CHAR")
     self.set_arg(1, arg1v, arg1t)
     self.set_arg(2, arg2v, arg2t)
 
+  # Checks if the arg2 is an integer, gets its character value
+  # and stores the string result in a variable specified by arg1.
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=2)
+    # if the operand is a variable, get its value and type
     if typ == 'var':
-      try:  # muze byt None
+      try:
         (val, typ) = prog.get_var_value_type(val)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
+    if typ != 'int':
+      sys.stderr.write('INT2CHAR: Invalid integer value.\n')
+      exit(58)
     try:
       result = chr(int(val))
-    except:
+    except: # not a valid value
       sys.stderr.write('INT2CHAR: Invalid integer value.\n')
       exit(58)
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'string'))
 
+# Class Stri2int represents STRI2INT instruction.
 class Stri2int(Instruction):
+  
+  # Stri2int constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("STRI2INT")
     self.set_arg(1, arg1v, arg1t)
     self.set_arg(2, arg2v, arg2t)
     self.set_arg(3, arg3v, arg3t)
 
+  # Checks if arg2 is an integer and arg1 string. Gets the character on index
+  # specified by arg2, converts it to its ordinal value and stores the integer
+  # result in a variable specified by arg1.
   def execute(self):
-    # TODO osetrit None?
     (val1, typ1) = self.get_arg_value_type(arg_num=2)
     (val2, typ2) = self.get_arg_value_type(arg_num=3)
     if typ1 == 'var':
-      try:  # muze byt None
+      try:
         (val1, typ1) = prog.get_var_value_type(val1)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
     if typ2 == 'var':
-      try:  # muze byt None
+      try:
         (val1, typ1) = prog.get_var_value_type(val1)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
+    # check the types
     if typ1 != 'string' and typ2 != 'int':
       sys.stderr.write('STRI2INT: Invalid operand type.\n')
       exit(53)
     try:
       result = ord(val1[int(val2)])
-    except:
+    except:   # invalid value, index out of range
       sys.stderr.write('STRI2INT: Index out of range.\n')
       exit(58)
-    # TypeError exception if invalid chr()?
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
 
-
+# Class Read represents READ instruction.
 class Read(Instruction):
 
+  # Read constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t):
     super().__init__("READ")
-    #self.set_args2(arg1v, arg1t, arg2v, arg2t)
     self.set_arg(1, arg1v, arg1t)
     self.set_arg(2, arg2v, arg2t)
 
+  # Reads a value from the input file/stdin, converts the escape characters
+  # and stores it to a variable specified by arg1.
   def execute(self):
-    # print('\nExecuting read.')
-    #input_file = prog.get_input_file()
     if prog.get_input_file_pointer() == None:
-    #if input_file == '<stdin>':
       try:
         inp = input()
       except ValueError:
         inp = None
     else:
-      #try:
-      #  f = open(input_file, "r")
-      #except FileNotFoundError:
-      #  sys.stderr.write('File ' + input_file + 'not found.\n')
-      #  exit(11)
       inp = prog.get_input_file_pointer().readline()
       inp = inp.rstrip('\n')
-
+    # check the input value type and converts it
     try:
-      #inp = input_file.readline()
-      if self.get_arg_value(arg_num=1) == 'int':    # FIXME why tady bylo 2 misto 1?
+      if self.get_arg_value(arg_num=1) == 'int':
         inp = int(inp)
       elif self.get_arg_value(arg_num=1) == 'string':
         inp = str(inp)
       elif self.get_arg_value(arg_num=1) == 'bool':
+        # TODO store it as True and False, ne?
         if inp.upper() == 'TRUE':
           inp = 'true'
         else:
           inp = 'false'
-    except ValueError:
+    except ValueError:  # invalid input
       inp = None
     prog.set_var_value(self.get_arg_value(arg_num=1), (inp, self.get_arg_value(arg_num=2)))
 
+# Class Write represents WRITE instruction.
 class Write(Instruction):
+
+  # Write constructor.
   def __init__(self, arg1v, arg1t):
     super().__init__("WRITE")
     self.set_arg(1, arg1v, arg1t)
 
+  # Prints the value specified by arg1 to the stdout.
   def execute(self):
-    print("executing write")
     (val, typ) = self.get_arg_value_type(arg_num=1)
     if typ == 'var':
+      var_name = val
       try:
-        var_name = val
         (val, typ) = prog.get_var_value_type(val)
-      except TypeError:   # variable is declared but not defined
-        sys.stderr.write('Variable ' + var_name + ' is not defined.\n')
-        exit(56)
-      except SystemExit as ex:  # variable is not declared
+      # TODO ma tady teda byt SystemExit exception nebo ne? :reee:
+      except SystemExit as ex:  # variable is not declared (exit 54)
         sys.stderr.write(ex.args[0])
         exit(ex.args[1])
-        
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
+    # convert the value and print it
     if typ == 'nil':
       print('', end='')
     elif typ == 'bool':
@@ -1054,182 +1336,240 @@ class Write(Instruction):
       print(val, end='')
     else:
       print(val, end='')
-      #print(re.sub(r'\\([0-9]{3})', lambda x: chr(int(x[1])), val), end='')
 
+# Class Concat represents CONCAT instruction.
 class Concat(Arithmetic):
+
+  # Concat constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("CONCAT", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
+  # Concatenates two strings and stores it to the variable specified by arg1.
   def execute(self):
     (val1, val2, typ) = super().check_operand_type_eq()
-
     if typ != 'string':
+      sys.stderr.write('CONCAT: wrong operand type.\n')
+      exit(53)
+    try:
+      val1 = str(val1)
+      val2 = str(val2)
+    except:
       sys.stderr.write('CONCAT: wrong operand type.\n')
       exit(53)
     prog.set_var_value(self.get_arg_value(arg_num=1), (val1 + val2, 'string'))
 
+# Class Strlen represents STRLEN instruction.
 class Strlen(Instruction):
+
+  # Strlen constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t):
     super().__init__("STRLEN")
     self.set_arg(1, arg1v, arg1t)
     self.set_arg(2, arg2v, arg2t)
 
+  # Stores the length of arg2 string into the variable specified by arg1.
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=2)
     if typ == 'var':
       try:
         (val, typ) = prog.get_var_value_type(val)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
     if typ != 'string':
       sys.stderr.write('STRLEN: wrong operand type.\n')
       exit(53)
     try:
+      val = str(val)
       result = len(val)
-    except:
+    except:   # invalid type
       sys.stderr.write('STRLEN: wrong operand type.\n')
       exit(53)
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'int'))
 
+# Class Getchar represents GETCHAR instruction.
 class Getchar(Arithmetic):
+
+  # Getchar constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("GETCHAR", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
+  # Gets one character from string arg2 on index arg3 and stores the character
+  # to a variable specified by arg1.
   def execute(self):
-    # TODO osetrit None?
     (val1, typ1) = self.get_arg_value_type(arg_num=2)
     (val2, typ2) = self.get_arg_value_type(arg_num=3)
     if typ1 == 'var':
-      try:  # muze byt None
+      try:
         (val1, typ1) = prog.get_var_value_type(val1)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
     if typ2 == 'var':
-      try:  # muze byt None
+      try:
         (val2, typ2) = prog.get_var_value_type(val2)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
+    # check the types
     if typ1 != 'string' and typ2 != 'int':
       sys.stderr.write('GETCHAR: Invalid operand type.\n')
-      exit(58)
+      exit(53)
     try:
       result = val1[int(val2)]
-    except:
+    except:   # index out of range
       sys.stderr.write('GETCHAR: Index out of range.\n')
       exit(58)
-    # TypeError exception if invalid chr()?
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'string'))
 
+# Class Setchar represents SETCHAR instruction. 
 class Setchar(Arithmetic):
+
+  # Setchar constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("SETCHAR", arg1v, arg1t, arg2v, arg2t, arg3v, arg3t)
 
+  # Modifies a character in arg1 variable on index arg2 to the character 
+  # specified by arg3.
   def execute(self):
-    # get the value of variable
     (var, typ) = self.get_arg_value_type(arg_num=1)
     (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
     (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
     if symb1_typ == 'var':
       try:
         (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except TypeError:
-        sys.stderr.write('SETCHAR: variable is not defined.\n')
-        exit(54)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
     if symb2_typ == 'var':
       try:
         (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except TypeError:
-        sys.stderr.write('SETCHAR: variable is not defined.\n')
-        exit(54)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
+    # check the types
     if typ != 'var' and symb1_typ != 'int' and symb2_typ != 'string':
       sys.stderr.write('SETCHAR: wrong operand type.\n')
       exit(53)
     try:
       (var_val, var_typ) = prog.get_var_value_type(var)
-    except TypeError:
-      sys.stderr.write('SETCHAR: variable is not defined.\n')
-      exit(54)
+    except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+    except TypeError: # NoneType -> variable is not defined (exit 56)
+      sys.stderr.write('Variable is not defined.\n')
+      exit(56)
     if var_typ != 'string':
       sys.stderr.write('SETCHAR: wrong operand type.\n')
       exit(53)
     try:
       index = int(symb1_val)
       result = var_val[:index] + symb2_val[0] + var_val[(index+1):]
-    except TypeError:
+    except IndexError:
       sys.stderr.write('SETCHAR: index out of range.\n')
-      exit(53)
-    except ValueError:
+      exit(58)
+    except:
       sys.stderr.write('SETCHAR: wrong operand type.\n')
       exit(53)
     prog.set_var_value(var, (result, 'string'))
 
+# Class Type represents TYPE instruction.
 class Type(Instruction):
+
+  # Type constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t):
     super().__init__("TYPE")
     self.set_arg(1, arg1v, arg1t)
     self.set_arg(2, arg2v, arg2t)
 
+  # Gets the type of arg2 and stores it as a string to a variable specified by arg
   def execute(self):
     (symb_val, symb_typ) = self.get_arg_value_type(arg_num=2)
     if symb_typ == 'var':
       try:
         (var_val, var_typ) = prog.get_var_value_type(symb_val)
         symb_typ = var_typ
-      except SystemExit:
-        exit(123)
-      except:
-        print("BLAH")
-        # None - neinicializovana
-        symb_typ = ''
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined -> string = ''
+        symb_typ = '' 
     prog.set_var_value(self.get_arg_value(arg_num=1), (symb_typ, 'string'))
-    print("EY")
     
+# Class Label represents LABEL instruction.
 class Label(Instruction):
+
+  # Label constructor.
   def __init__(self, arg1v, arg1t, order):
     super().__init__("LABEL")
     self.set_arg(1, arg1v, arg1t)
     prog.add_label(arg1v, order)
 
+  # Label does nothing when executing.
   def execute(self):
-    #print('Executing label (label does nothing).')
     pass
   
+# Class Jump represents JUMP instruction.
 class Jump(Instruction):
+
+  # Jump constructor.
   def __init__(self, arg1v, arg1t):
     super().__init__("JUMP")
     self.set_arg(1, arg1v, arg1t)
 
+  # Sets the instruction counter to the label specified by arg1.
   def execute(self):
-    # zmena rizeni toku programu
-    #print('Executing jump.')
     prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
 
+# Class Jumpifeq represents JUMPIFEQ instruction.
 class Jumpifeq(Instruction):
+
+  # Jumpifeq constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("JUMPIFEQ")
     self.set_arg(1, arg1v, arg1t)
     self.set_arg(2, arg2v, arg2t)
     self.set_arg(3, arg3v, arg3t)
 
+  # Checks if arg2 and arg3 are equal and if they are, jumps 
+  # to the label specified by arg1.
   def execute(self):
-    # zmena rizeni toku programu
     (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
     (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
     if symb1_typ == 'var':
-      try:  # muze byt None
+      try:
         (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
     if symb2_typ == 'var':
-      try:  # muze byt None
+      try:
         (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
+    # check the types and values
     if symb1_typ == symb2_typ:
       if symb1_typ == 'int':
         try:
@@ -1237,41 +1577,49 @@ class Jumpifeq(Instruction):
           symb2_val = int(symb2_val)
         except TypeError:
           sys.stderr.write('Invalid int type in JUMPIFEQ.\n')
-          exit(32)
+          exit(53)
       if symb1_val == symb2_val:
         prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
     elif symb1_typ == 'nil' or symb2_typ == 'nil':
-      #print('Not sure co s tim nilem')
       if symb1_typ == symb2_typ:
         prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
     else:
       sys.stderr.write('JUMPIFEQ: wrong operand type.\n')
       exit(53)
 
+# Class Jumpifneq represents JUMPIFNEQ instruction.
 class Jumpifneq(Instruction):
+
+  # Jumpifneq constructor.
   def __init__(self, arg1v, arg1t, arg2v, arg2t, arg3v, arg3t):
     super().__init__("JUMPIFNEQ")
     self.set_arg(1, arg1v, arg1t)
     self.set_arg(2, arg2v, arg2t)
     self.set_arg(3, arg3v, arg3t)
 
+  # Checks if arg2 and arg3 are equal and if they are not, jumps 
+  # to the label specified by arg1.
   def execute(self):
-    # zmena rizeni toku programu
-    #print('Executing jump.')
     (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
     (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
     if symb1_typ == 'var':
-      try:  # muze byt None
+      try:
         (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
     if symb2_typ == 'var':
-      try:  # muze byt None
+      try:
         (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except:
-        sys.stderr.write(self.get_opcode() + ': variable is not defined.\n')
-        exit(54)
+      except SystemExit as ex:  # variable is not declared (exit 54)
+        sys.stderr.write(ex.args[0])
+        exit(ex.args[1])
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
     if symb1_typ == symb2_typ:
       if symb1_typ == 'int':
         try:
@@ -1279,7 +1627,7 @@ class Jumpifneq(Instruction):
           symb2_val = int(symb2_val)
         except TypeError:
           sys.stderr.write('Invalid int type in JUMPIFEQ.\n')
-          exit(32)
+          exit(53)
       if symb1_val != symb2_val:
         prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
     elif symb1_typ == 'nil' or symb2_typ == 'nil':
@@ -1289,11 +1637,15 @@ class Jumpifneq(Instruction):
       sys.stderr.write('JUMPIFNEQ: wrong operand type.\n')
       exit(53)
 
+# Class Exit represents EXIT instruction.
 class Exit(Instruction):
+
+  # Exit constructor.
   def __init__(self, arg1v, arg1t):
       super().__init__("EXIT")
       self.set_arg(1, arg1v, arg1t)
 
+  # Exits the program with a specified exit number.
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=1)
     try:
@@ -1305,34 +1657,44 @@ class Exit(Instruction):
       sys.stderr.write('Invalid EXIT number.\n')
       exit(57)
     else:
-      # TODO osetrit uzavreni souboru atd. -> pak return asi
-      # je to vubec v Pythonu treba osetrovat?
+      # TODO osetrit uzavreni souboru atd.
       exit(exit_code)
 
+# Class Dprint represents DPRINT instruction.
 class Dprint(Instruction):
+
+  # Dprint constructor.
   def __init__(self, arg1v, arg1t):
       super().__init__("DPRINT")
       self.set_arg(1, arg1v, arg1t)
 
+  # Prints arg1 to the stderr.
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=1)
     sys.stderr.write(val + ' of type ' + typ + '\n')
 
+# Class Break represents BREAK instruction.
 class Break(Instruction):
+
+  # Break constructor.
   def __init__(self):
       super().__init__("BREAK")
 
+  # Prints instruction order and the variables in global frame to the stderr.
   def execute(self):
     sys.stderr.write('Instruction: BREAK\nInstruction order: ' + prog.get_instr_counter() + '\n')
     sys.stderr.write('GF:\n')
     sys.stderr.write(prog.get_frame_dict('GF'))
     sys.stderr.write('\n')
 
+
+# --------------------------------------------------------------------------------
+# Factory class for creating instances of the instructions.
 class Factory:
 
+  # Checks if there are any invalid args inside the instruction.
   def check_args(opcode: str, root):
-    # check if there are only arg1, arg2 and arg3 tags
-        
+    # number of arguments in the opcode
     zero_arg = ['CREATEFRAME', 'PUSHFRAME', 'POPFRAME', 'RETURN', 'BREAK', 'CLEARS', 'ADDS',\
                 'SUBS', 'MULS', 'IDIVS', 'LTS', 'GTS', 'EQS', 'ANDS', 'ORS', 'NOTS',\
                 'INT2CHARS', 'STRI2INTS']
@@ -1342,8 +1704,6 @@ class Factory:
     three_args = ['ADD', 'SUB', 'MUL', 'IDIV', 'LT', 'GT', 'EQ', 'AND', 'OR', 'STRI2INT',\
                   'CONCAT', 'GETCHAR', 'SETCHAR', 'JUMPIFEQ', 'JUMPIFNEQ']
 
-    operands = ['var', 'label', 'type', 'int', 'string', 'bool', 'nil']
-    
     # check the number of args in opcode
     for child in root:
       if opcode in zero_arg:
@@ -1365,31 +1725,34 @@ class Factory:
         sys.stderr.write('Invalid opcode ' + opcode + '.\n')
         exit(32)
 
+    # check arg types
+    operands = ['var', 'label', 'type', 'int', 'string', 'bool', 'nil']
     if opcode not in zero_arg:
-      # TODO remove and fix
-      child = root
       # check if the arg is var, label, type, int, string, bool, nil
-      if child.find('arg1').attrib['type']:
-        if child.find('arg1').attrib['type'] not in operands:
-          sys.stderr.write('Invalid operand type in arg1.\n')
-          exit(32)
-      elif child.find('arg1').attrib['type']:
-        if child.find('arg1').attrib['type'] not in operands:
-          sys.stderr.write('Invalid operand type in arg2.\n')
-          exit(32)
-      elif child.find('arg1').attrib['type']:
-        if child.find('arg1').attrib['type'] not in operands:
-          sys.stderr.write('Invalid operand type in arg3.\n')
-          exit(32)
-  
+      try:
+        if root.find('arg1').attrib['type']:
+          if root.find('arg1').attrib['type'] not in operands:
+            sys.stderr.write('Invalid operand type in arg1.\n')
+            exit(32)
+        elif root.find('arg2').attrib['type']:
+          if root.find('arg2').attrib['type'] not in operands:
+            sys.stderr.write('Invalid operand type in arg2.\n')
+            exit(32)
+        elif root.find('arg3').attrib['type']:
+          if root.find('arg3').attrib['type'] not in operands:
+            sys.stderr.write('Invalid operand type in arg3.\n')
+            exit(32)
+      except AttributeError:
+        sys.stderr.write('Invalid input XML.\n')
+        exit(32)
 
+  # Resolves the intruction specified by 'opcode' and call its constructor.
   @classmethod
   def resolve(cls, opcode: str, root):
     opcode = opcode.upper()
-
-    # check if there is not any invalid tag
+    # check if all args are valid
     cls.check_args(opcode, root)
-
+    #resolve the instruction
     try:
       if opcode == 'MOVE':
         return Move(root.find('arg1').text, root.find('arg1').attrib['type'],\
@@ -1536,6 +1899,19 @@ class Factory:
       sys.stderr.write('Invalid input XML.\n')
       exit(32)
 
+
+# --------------------------------------------------------------------------------------
+
+def print_help():
+  print('This script interprets an input file in XML representation.\n'\
+            'Usage:\n'\
+            '   python3.8 interpret.py [--input=file] [--source=file]\n'\
+            '- at least one of the arguments must be specified, the second one\n'\
+            '  can be taken from stdin.\n'
+            '\n'\
+            'Print help:\n'\
+            'python3.8 interpret.py --help')
+
 def parse_arguments():
   ap = argparse.ArgumentParser(conflict_handler="resolve")
   ap.add_argument("--help", "-h", action='store_true')
@@ -1549,14 +1925,7 @@ def parse_arguments():
       sys.stderr.write('Invalid arguments.\n')
       exit(10)
     else:
-      print('This script interprets an input file in XML representation.\n'\
-            'Usage:\n'\
-            '   python3.8 interpret.py [--input=file] [--source=file]\n'\
-            '- at least one of the arguments must be specified, the second one\n'\
-            '  can be taken from stdin.\n'
-            '\n'\
-            'Print help:\n'\
-            'python3.8 interpret.py --help')
+      print_help()
       exit(0)
 
   if args['source'] is None:
@@ -1604,8 +1973,6 @@ def parse_arguments():
 
   # source, input, if any of them is None -> means stdin
   return (source_file, input_file)
-
-
 
 
 # xml load
@@ -1674,8 +2041,7 @@ def xml_load(source_file):
 
 if __name__ == '__main__':
 
-  (source_file, input_file) = parse_arguments() # returns (source_file, input_file)
-  #parse_arguments()
+  (source_file, input_file) = parse_arguments()
 
   if input_file != None:
     try:
@@ -1690,12 +2056,3 @@ if __name__ == '__main__':
   stack = Stack()
 
   xml_load(source_file)
-
-  sys.stderr.write("Program successfully processed.\n")
-  #print("\n\nProgram successfully processed.")
-
-
-  #exit(blah)
-
-  #source_file.close()
-  #input_file.close()
