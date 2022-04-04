@@ -31,9 +31,6 @@ class Program:
     if name in self._label_dict:
       sys.stderr.write('Label ' + name + ' already exists.\n')
       exit(52)
-      #raise SystemExit('Label ' + name + ' already exists.\n', 52)
-      #sys.stderr.write('Label ' + name + ' already exists.\n')
-      #exit(52)
     self._label_dict[name] = order
 
   # Returns order of the label specified by label_name.
@@ -41,7 +38,6 @@ class Program:
     if not label_name in self._label_dict:
       sys.stderr.write('Label ' + label_name + ' doesn\'t exist.\n')
       exit(52)
-      #raise SystemExit('Label ' + label_name + ' doesn\'t exist.\n', 52)
     return self._label_dict[label_name]
 
   # Returns current instruction order.
@@ -62,9 +58,7 @@ class Program:
       return self._call_stack.pop()
     except IndexError:
       sys.stderr.write('Call stack is empty.\n')
-      exit(56)
-      #raise SystemExit('Call stack is empty.\n', 56)
-      
+      exit(56)      
 
   # Adds instruction to the instruction dictionary.
   def add_instr(self, order, instr):
@@ -80,9 +74,7 @@ class Program:
       self._instr_dict = {key:value for key, value in sorted(self._instr_dict.items(), key=lambda item: int(item[0]))}
     except ValueError:
       sys.stderr.write('Invalid input XML.\n')
-      exit(32)
-      #raise SystemExit('Invalid input XML.\n', 32)
-      
+      exit(32)      
 
   # Declares new variable (the type must be 'var').
   # Value and type of the variable is set to None.
@@ -99,32 +91,23 @@ class Program:
     except SystemExit as ex:
       sys.stderr.write(ex.args[0])
       exit(ex.args[1])
-    #frame.set_var(name, typ)
 
   # Sets a variable specified by 'name' to (value, type).
   def set_var_value(self, name, value_type):
     value, typ = (value_type)
-    #frame = self.get_frame(name)
     try:
       frame = self.get_frame(name)
     except SystemExit as ex:
       sys.stderr.write(ex.args[0])
       exit(ex.args[1])
     try:
-      # frame.set_var_value(name, value, typ)
-
-      # second moznost - rovnou oboji
-      # set the variable 'name' to value and typ
-      #self.get_frame(name).set_var_value(name, value, typ)
       frame.set_var_value(name, value, typ)
     except SystemExit as ex:
       sys.stderr.write(ex.args[0])
       exit(ex.args[1])
-      #raise ex
 
   # Returns the value of a variable specified by 'name'.
   def get_var_value(self, name):
-    #frame = self.get_frame(name)
     try:
       frame = self.get_frame(name)
     except SystemExit as ex:
@@ -133,7 +116,6 @@ class Program:
     try:
       val = frame.get_var_value(name[3:]) # cut the frame name
     except SystemExit as ex:
-      #raise ex
       sys.stderr.write(ex.args[0])
       exit(ex.args[1])
     return val
@@ -150,7 +132,6 @@ class Program:
     except SystemExit as ex:
       sys.stderr.write(ex.args[0])
       exit(ex.args[1])
-      #raise ex
     return valtype
 
   # Returns frame specified by first two characters in frame_name.
@@ -161,26 +142,19 @@ class Program:
     elif frame_name[0:2] == 'LF':
       # local frame
       if self._lf == None:
-        #sys.stderr.write('Uninitialised local frame.\n')
-        #exit(55)
         raise SystemExit('Uninitialised local frame.\n', 55)
       return self._lf
     elif frame_name[0:2] == 'TF':
       # temporary frame
       if self._tf == None:
-        #sys.stderr.write('Uninitialised temporary frame.\n')
-        #exit(55)
         raise SystemExit('Uninitialised temporary frame.\n', 55)
       return self._tf
     else:
       # invalid variable name - should not happen in the interpret
-      #sys.stderr.write('Invalid variable/frame name.\n')
-      #exit(55)
       raise SystemExit('Invalid variable/frame name.\n', 55)
 
   # Returns frame dictionary.
   def get_frame_dict(self, frame_name):
-    #frame = self.get_frame(frame_name)
     try:
       frame = self.get_frame(frame_name)
     except SystemExit as ex:
@@ -200,7 +174,6 @@ class Program:
     if self._tf == None:
       sys.stderr.write('Uninitialised temporary frame.\n')
       exit(55)
-      #raise SystemExit('Uninitialised temporary frame.\n', 55)
     # pass the TF reference to LF
     self._lf = self._tf
     self._tf = None
@@ -216,7 +189,6 @@ class Program:
     except IndexError:
       sys.stderr.write('Stack of local frames is empty.\n')
       exit(55)
-      #raise SystemExit('Stack of local frames is empty.\n', 55)
     # set local frame to frame on the top of the stack
     if self._lf_stack:
       self._lf = self._lf_stack[-1] # top
@@ -241,14 +213,10 @@ class Frame:
   def set_var(self, name, typ):
     # check if the type is var
     if typ != 'var':
-      #sys.stderr.write('Invalid operand type.\n')
-      #exit(53)
       raise SystemExit('Invalid operand type.\n', 53)
     # check if the variable is in the frame dictionary
     name = name[3:]
     if name in self._frame_dict:
-      #sys.stderr.write('Redefinition of variable ' + name + '.\n')
-      #exit(52)
       raise SystemExit('Redefinition of variable ' + name + '.\n', 52)
     # add the variable and set its value and type to None
     self._frame_dict[name] = None
@@ -306,7 +274,9 @@ class Stack():
     try:
       return self._operand_stack.pop()
     except IndexError:
-      raise SystemExit('Operand stack is empty.\n', 56)
+      #raise SystemExit('Operand stack is empty.\n', 56)
+      sys.stderr.write('Operand stack is empty.\n')
+      exit(56)
 
   # Returns an operand stack.
   def get_operand_stack(self):
@@ -320,21 +290,15 @@ class Stack():
     except SystemExit as ex:
       raise ex
     if op_type == 'var':
-      try:  # may be None
+      try:
         (op, op_type) = prog.get_var_value_type(op)
-      except:
-        #sys.stderr.write('Variable is not defined.\n')
-        #exit(54)
+      except: # var value is None
         raise SystemExit('Variable is not defined.\n', 54)
     if op_type != 'int':
-      #sys.stderr.write('Invalid operand type on the operand stack.\n')
-      #exit(53)
       raise SystemExit('Invalid operand type on the operand stack.\n', 53)
     try:
       op = int(op)
     except ValueError:
-      #sys.stderr.write('Invalid operand type on the operand stack.\n')
-      #exit(53)
       raise SystemExit('Invalid operand type on the operand stack.\n', 53)
     return op
 
@@ -471,11 +435,6 @@ class Arithmetic(Instruction):
       try:
         var_name = val
         (val, typ) = prog.get_var_value_type(val)
-        """
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
-        """
       except TypeError:   # variable is not defined (exit 56)
         sys.stderr.write('Variable ' + var_name + ' is not defined.\n')
         exit(56)
@@ -500,22 +459,12 @@ class Arithmetic(Instruction):
     if typ1 == 'var':
       try:
         (val1, typ1) = prog.get_var_value_type(val1)
-        """
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
-        """
       except TypeError:   # variable is not defined (exit 56)
         sys.stderr.write(self.get_opcode() + ': Variable is not defined.\n')
         exit(56)
     if typ2 == 'var':
       try:  # muze byt None
         (val1, typ1) = prog.get_var_value_type(val1)
-        """
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
-        """
       except TypeError:   # variable is not defined (exit 56)
         sys.stderr.write(self.get_opcode() + ': Variable is not defined.\n')
         exit(56)
@@ -870,9 +819,6 @@ class Int2chars(Instruction):
     if typ == 'var':
       try:
         (val, typ) = prog.get_var_value_type(val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
@@ -904,9 +850,6 @@ class Stri2ints(Instruction):
     if typ1 == 'var':
       try:
         (val1, typ1) = prog.get_var_value_type(val1)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
@@ -937,18 +880,12 @@ class Jumpifeqs(Instruction):
     if symb1_typ == 'var':
       try:
         (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
     if symb2_typ == 'var':
       try:
         (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
@@ -987,18 +924,12 @@ class Jumpifneqs(Instruction):
     if symb1_typ == 'var':
       try:
         (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
     if symb2_typ == 'var':
       try:
         (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
@@ -1205,9 +1136,6 @@ class Int2char(Instruction):
     if typ == 'var':
       try:
         (val, typ) = prog.get_var_value_type(val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
@@ -1240,18 +1168,12 @@ class Stri2int(Instruction):
     if typ1 == 'var':
       try:
         (val1, typ1) = prog.get_var_value_type(val1)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
     if typ2 == 'var':
       try:
         (val1, typ1) = prog.get_var_value_type(val1)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
@@ -1318,9 +1240,6 @@ class Write(Instruction):
       try:
         (val, typ) = prog.get_var_value_type(val)
       # TODO ma tady teda byt SystemExit exception nebo ne? :reee:
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
@@ -1373,9 +1292,6 @@ class Strlen(Instruction):
     if typ == 'var':
       try:
         (val, typ) = prog.get_var_value_type(val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
@@ -1405,18 +1321,12 @@ class Getchar(Arithmetic):
     if typ1 == 'var':
       try:
         (val1, typ1) = prog.get_var_value_type(val1)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
     if typ2 == 'var':
       try:
         (val2, typ2) = prog.get_var_value_type(val2)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
@@ -1447,18 +1357,12 @@ class Setchar(Arithmetic):
     if symb1_typ == 'var':
       try:
         (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
     if symb2_typ == 'var':
       try:
         (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
@@ -1468,9 +1372,6 @@ class Setchar(Arithmetic):
       exit(53)
     try:
       (var_val, var_typ) = prog.get_var_value_type(var)
-    except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
     except TypeError: # NoneType -> variable is not defined (exit 56)
       sys.stderr.write('Variable is not defined.\n')
       exit(56)
@@ -1504,9 +1405,6 @@ class Type(Instruction):
       try:
         (var_val, var_typ) = prog.get_var_value_type(symb_val)
         symb_typ = var_typ
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined -> string = ''
         symb_typ = '' 
     prog.set_var_value(self.get_arg_value(arg_num=1), (symb_typ, 'string'))
@@ -1554,18 +1452,12 @@ class Jumpifeq(Instruction):
     if symb1_typ == 'var':
       try:
         (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
     if symb2_typ == 'var':
       try:
         (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
@@ -1605,18 +1497,12 @@ class Jumpifneq(Instruction):
     if symb1_typ == 'var':
       try:
         (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
     if symb2_typ == 'var':
       try:
         (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except SystemExit as ex:  # variable is not declared (exit 54)
-        sys.stderr.write(ex.args[0])
-        exit(ex.args[1])
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
