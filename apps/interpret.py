@@ -1,4 +1,18 @@
-# Comment
+# #################### interpret.py #################### #
+#        Principles of Programming Languages (IPP)       #
+#               Lucie Svobodova, xsvobo1x                #
+#               xsvobo1x@stud.fit.vutbr.cz               #
+#                        FIT BUT                         #
+#                       2021/2022                        #
+# ###################################################### #
+
+# This script interprets an input file in XML representation.
+# Usage:
+#   python3.8 interpret.py [--input=file] [--source=file]
+#   - at least one of the arguments must be specified, 
+#   the second one is stdin then.
+# Print help:
+#   python3.8 interpret.py --help
 
 import argparse
 import sys
@@ -1786,86 +1800,86 @@ class Factory:
       exit(32)
 
 
-# --------------------------------------------------------------------------------------
-
+# --------------------------------------------------------------------------------
+# Function prints help to the stdout.
 def print_help():
   print('This script interprets an input file in XML representation.\n'\
             'Usage:\n'\
             '   python3.8 interpret.py [--input=file] [--source=file]\n'\
             '- at least one of the arguments must be specified, the second one\n'\
-            '  can be taken from stdin.\n'
+            '  is stdin then.\n'
             '\n'\
             'Print help:\n'\
             'python3.8 interpret.py --help')
 
+
+# Function parses command line arguments.
+# Returns a tuple (source_file, input_file).Stdin is represented as None in th tuple.
 def parse_arguments():
   ap = argparse.ArgumentParser(conflict_handler="resolve")
   ap.add_argument("--help", "-h", action='store_true')
   ap.add_argument("--source", nargs=1, action='append')
   ap.add_argument("--input", nargs=1, action='append')
+  # create a dictionary with options
+  args = vars(ap.parse_args())  
 
-  args = vars(ap.parse_args())  # dict with attributes
-  
+  # check if --help option is present
   if args['help']:
     if len(args) != 3 or args['input'] != None or args['source'] != None:
+      print_help()
       sys.stderr.write('Invalid arguments.\n')
       exit(10)
     else:
       print_help()
       exit(0)
 
+  # check if the combination of arguments is valid
   if args['source'] is None:
     if args['input'] is None:
-      print("BADASS")
       exit(10)
-
     if len(args['input']) != 1:
-      print("BADIDASS")
       exit(10)
-
-    source_file = None
-    input_file = args['input'][0][0]
-    
-  elif args['input'] is None:
-    if args['source'] is None:
-      print("BAD")
-      exit(10)
-
-    if len(args['source']) != 1:
-      print("BADER")
-      exit(10)
-
-    input_file = None
-    source_file = args['source'][0][0]
-    
-  elif len(args['source']) != 1 or len(args['input']) != 1:
-    print("BAD1")
-    exit(10)
-
-  elif args['input'][0][0] == args['source'][0][0]:
-    print("BAD2")
-    exit(10)
-  
-  else:
+    source_file = None  # stdin
+    # check if the input file exists
     if os.path.exists(args['input'][0][0]):
       input_file = args['input'][0][0]
     else:
       exit(11)
-    
+  elif args['input'] is None:
+    if args['source'] is None:
+      exit(10)
+    if len(args['source']) != 1:
+      exit(10)
+    input_file = None # stdin
+    # check if the source file exists
+    if os.path.exists(args['source'][0][0]):
+      source_file = args['source'][0][0]
+    else:
+      exit(11)
+  elif len(args['source']) != 1 or len(args['input']) != 1:
+    exit(10)
+  elif args['input'][0][0] == args['source'][0][0]:
+    exit(10)
+  else:
+    # check if the files exist
+    if os.path.exists(args['input'][0][0]):
+      input_file = args['input'][0][0]
+    else:
+      exit(11)
     if os.path.exists(args['source'][0][0]):
       source_file = args['source'][0][0]
     else:
       exit(11)
 
-  # source, input, if any of them is None -> means stdin
+  # return (source, input), stdin is represented as None
   return (source_file, input_file)
 
 
-# xml load
+# Function loads the input XML file into a tree. I resolves the instructions, stores them
+# to the program instructions dictionary. Afterwards they are sorted by order number.
 def xml_load(source_file):
-
+  # parse the XML file to the tree
   tree = ElementTree()
-  
   try:
     if source_file == None:  
       tree.parse(sys.stdin)
@@ -1874,61 +1888,61 @@ def xml_load(source_file):
   except:
     sys.stderr.write('Invalid input XML.\n')
     exit(31)
-
   root = tree.getroot()
 
-  # add right instruction (order : opcode)
+  # resolve the instructions
   for child in root:
     if (child.tag != 'instruction'):
       sys.stderr.write('Invalid input XML.\n')
       exit(32)
     try:
       instr = Factory.resolve(child.attrib['opcode'], child)
+      # check XML structure
       if (child.attrib['order'] in prog.get_instr_dict()) or (int(child.attrib['order']) < 0):
         sys.stderr.write('Invalid input XML file.\n')
         exit(32)
-    except (KeyError, ValueError):
-          exit(32)
+    except (KeyError, ValueError):  # invalid XML structure
+      exit(32)
+    # add the instruction to the program instruction dictionary
     prog.add_instr(child.attrib['order'], instr)
 
+  # sort the instruction dictionary by order number
   prog.sort()
 
-  # DRUHA SECOND CAST PROGRAMU
-  order_list = list(prog.get_instr_dict().keys())
-  index = 0
 
-  while index < len(order_list):
-    #print(order_list[index])
+# Function parses the XML file, creates Instruction objects in a Factory
+# stores them to the Program instruction dictionary and executes them afterwards. 
+def interpret(source_file):
+  # load XML file to the Program instruction dictionary
+  xml_load(source_file)
+
+  # interpret the instructions
+  order_list = list(prog.get_instr_dict().keys())   # sorted instructions list
+  pos = 0                                           # current position in the list
+
+  while pos < len(order_list):
     # set instruction counter to the order on current index
-    prog.set_instr_counter(order_list[index])
+    prog.set_instr_counter(order_list[pos])
 
     # execute the instruction
-    ins = prog.get_instr_dict()[order_list[index]]
+    ins = prog.get_instr_dict()[order_list[pos]]
     ins.execute()
 
     # detect if the program flow changed -> change the index
-    if prog.get_instr_counter() != order_list[index]:
-      index = order_list.index(prog.get_instr_counter())
+    if prog.get_instr_counter() != order_list[pos]:
+      pos = order_list.index(prog.get_instr_counter())
     
     # increment the program counter
-    index += 1
-
-# xml check
-
-# xml2inst
-
-# interpret instr
+    pos += 1
 
 
-
-
-
-
-
+# Main function.
 if __name__ == '__main__':
 
+  # parse command line arguments - get the source and input file
   (source_file, input_file) = parse_arguments()
 
+  # open the input file
   if input_file != None:
     try:
       input_file_pointer = open(input_file, "r")
@@ -1938,7 +1952,14 @@ if __name__ == '__main__':
   else:
     input_file_pointer = None
   
+  # create an instance of Program ans Stack (operand stack)
   prog = Program(input_file_pointer)
   stack = Stack()
 
-  xml_load(source_file)
+  # interpret the instructions
+  interpret(source_file)
+
+  # close the input file and exit
+  if input_file != None:
+    input_file_pointer.close()
+  exit(0)
