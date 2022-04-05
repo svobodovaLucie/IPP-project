@@ -895,6 +895,9 @@ class Stri2ints(Instruction):
     if typ1 != 'string':
       sys.stderr.write('STRI2INTS: Invalid operand type.\n')
       exit(53)
+    if val2 < 0 or val2 >= len(val1):
+      sys.stderr.write('STRI2INTS: Index out of range.\n')
+      exit(58)
     try:
       result = ord(val1[val2])
     except:
@@ -1211,7 +1214,15 @@ class Stri2int(Instruction):
       sys.stderr.write('STRI2INT: Invalid operand type.\n')
       exit(53)
     try:
-      result = ord(val1[int(val2)])
+      val2 = int(val2)
+    except:
+      sys.stderr.write('STRI2INT: Invalid operand type.\n')
+      exit(53)
+    if val2 < 0 or val2 >= len(val1):
+      sys.stderr.write('STRI2INT: Index out of range.\n')
+      exit(58)
+    try:
+      result = ord(val1[val2])
     except:   # invalid value, index out of range
       sys.stderr.write('STRI2INT: Index out of range.\n')
       exit(58)
@@ -1229,28 +1240,44 @@ class Read(Instruction):
   # Reads a value from the input file/stdin, converts the escape characters
   # and stores it to a variable specified by arg1.
   def execute(self):
+    inp_type = self.get_arg_value(arg_num=2)
+    # read from stdin
     if prog.get_input_file_pointer() == None:
       try:
         inp = input()
       except ValueError:
         inp = None
     else:
-      inp = prog.get_input_file_pointer().readline()
-      inp = inp.rstrip('\n')
+      # read from input file
+      inp_line = prog.get_input_file_pointer().readline()
+      inp = inp_line.rstrip('\n')
+      if len(inp) == 0:
+        if inp_type == 'string':
+          if len(inp_line) != 0:
+            inp = ''
+          else:
+            inp = None
+        else:
+          inp = None
     # check the input value type and converts it
+    
     try:
-      if self.get_arg_value(arg_num=1) == 'int':
+      if inp == None:
+        inp = 'nil'
+        inp_type = 'nil'
+      elif inp_type == 'int':
         inp = int(inp)
-      elif self.get_arg_value(arg_num=1) == 'string':
-        inp = str(inp)
-      elif self.get_arg_value(arg_num=1) == 'bool':
+      elif inp_type == 'string':
+          inp = str(inp)
+      elif inp_type == 'bool':
         if inp.upper() == 'TRUE':
           inp = True
         else:
           inp = False
     except ValueError:  # invalid input
-      inp = None
-    prog.set_var_value(self.get_arg_value(arg_num=1), (inp, self.get_arg_value(arg_num=2)))
+      inp = 'nil'
+      inp_type = 'nil'
+    prog.set_var_value(self.get_arg_value(arg_num=1), (inp, inp_type))
 
 # Class Write represents WRITE instruction.
 class Write(Instruction):
@@ -1341,7 +1368,7 @@ class Getchar(Arithmetic):
     except:   # invalid type
       sys.stderr.write('GETCHAR: Invalid operand type.\n')
       exit(53)
-    if val2 < 0:
+    if val2 < 0 or val2 >= len(val1):
       sys.stderr.write('GETCHAR: Index out of range.\n')
       exit(58)
     try:
@@ -1363,7 +1390,7 @@ class Setchar(Arithmetic):
   def execute(self):
     # check if the first operand is a variable
     if self.get_arg_type(arg_num=1) != 'var':
-      sys.stderr.write('SETCHAR: wrong operand type.\n')
+      sys.stderr.write('SETCHAR: Wrong operand type.\n')
       exit(53)
     # get values of the operands
     var = self.get_arg_value(arg_num=1)
@@ -1371,7 +1398,7 @@ class Setchar(Arithmetic):
     (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
     # check the types
     if symb1_typ != 'int' or symb2_typ != 'string':
-      sys.stderr.write('SETCHAR: wrong operand type.\n')
+      sys.stderr.write('SETCHAR: Wrong operand type.\n')
       exit(53)
     # get value of the variable var
     try:
@@ -1380,23 +1407,24 @@ class Setchar(Arithmetic):
       sys.stderr.write('Variable is not defined.\n')
       exit(56)
     if var_typ != 'string':
-      sys.stderr.write('SETCHAR: wrong operand type.\n')
+      sys.stderr.write('SETCHAR: Wrong operand type.\n')
       exit(53)
     try:
       index = int(symb1_val)
+      var_val = str(var_val)
     except:
-      sys.stderr.write('SETCHAR: wrong operand type.\n')
+      sys.stderr.write('SETCHAR: Wrong operand type.\n')
       exit(53)
-    if index < 0:
-      sys.stderr.write('SETCHAR: index out of range.\n')
+    if index < 0 or index >= len(var_val):
+      sys.stderr.write('SETCHAR: Index out of range.\n')
       exit(58)
     try:
       result = var_val[:index] + symb2_val[0] + var_val[(index+1):]
     except IndexError:
-      sys.stderr.write('SETCHAR: index out of range.\n')
+      sys.stderr.write('SETCHAR: Index out of range.\n')
       exit(58)
     except:
-      sys.stderr.write('SETCHAR: wrong operand type.\n')
+      sys.stderr.write('SETCHAR: Wrong operand type.\n')
       exit(53)
     prog.set_var_value(var, (result, 'string'))
 
