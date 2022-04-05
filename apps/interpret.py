@@ -290,6 +290,9 @@ class Stack():
     # TODO co treba retezec s escape sekvencemi
     # TODO co var? Nechat jako var nebo tam dat jeji hodnotu?
     (value, typ) = data
+    if typ == 'var':
+      # TODO opravit - check if var exists 
+      prog.get_var_value(value)
     if typ == 'string':
       # check empty string
       if value == None:
@@ -1173,10 +1176,15 @@ class Int2char(Instruction):
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=2)
     if typ != 'int':
-      sys.stderr.write('INT2CHAR: Invalid integer value.\n')
-      exit(58)
+      sys.stderr.write('INT2CHAR: Wrong operand type.\n')
+      exit(53)
     try:
-      result = chr(int(val))
+      val = int(val)
+    except:
+      sys.stderr.write('INT2CHAR: Wrong operand type.\n')
+      exit(53)
+    try:
+      result = chr(val)
     except: # not a valid value
       sys.stderr.write('INT2CHAR: Invalid integer value.\n')
       exit(58)
@@ -1329,13 +1337,18 @@ class Getchar(Arithmetic):
       sys.stderr.write('GETCHAR: Invalid operand type.\n')
       exit(53)
     try:
-      result = val1[int(val2)]
+      val2 = int(val2)
+    except:   # invalid type
+      sys.stderr.write('GETCHAR: Invalid operand type.\n')
+      exit(53)
+    if val2 < 0:
+      sys.stderr.write('GETCHAR: Index out of range.\n')
+      exit(58)
+    try:
+      result = val1[val2]
     except IndexError:   # index out of range
       sys.stderr.write('GETCHAR: Index out of range.\n')
       exit(58)
-    except:   # invalid type
-      sys.stderr.write('Invalid operand type.\n')
-      exit(53)
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'string'))
 
 # Class Setchar represents SETCHAR instruction. 
@@ -1371,6 +1384,13 @@ class Setchar(Arithmetic):
       exit(53)
     try:
       index = int(symb1_val)
+    except:
+      sys.stderr.write('SETCHAR: wrong operand type.\n')
+      exit(53)
+    if index < 0:
+      sys.stderr.write('SETCHAR: index out of range.\n')
+      exit(58)
+    try:
       result = var_val[:index] + symb2_val[0] + var_val[(index+1):]
     except IndexError:
       sys.stderr.write('SETCHAR: index out of range.\n')
