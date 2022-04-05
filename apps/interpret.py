@@ -18,6 +18,7 @@ import argparse
 import sys
 import os
 import re
+from unittest import result
 from xml.etree.ElementTree import ElementTree
 
 # Class Program is a singleton. It represents the input program
@@ -288,14 +289,29 @@ class Stack():
   def operand_stack_push(self, data):
     # TODO co treba retezec s escape sekvencemi
     # TODO co var? Nechat jako var nebo tam dat jeji hodnotu?
-    self._operand_stack.append(data)
+    (value, typ) = data
+    if typ == 'string':
+      # check empty string
+      if value == None:
+        value = ''
+      # convert escape sequences
+      else:
+        value = re.sub(r'\\([0-9]{3})', lambda x: chr(int(x[1])), value)
+    if typ == 'bool':
+      try:
+        if value.upper() == 'TRUE':
+          value = True
+        else:
+          value = False
+      except AttributeError:
+        pass
+    self._operand_stack.append((value, typ))
 
   # Pops an operand from the stack.
   def operand_stack_pop(self):
     try:
       return self._operand_stack.pop()
     except IndexError:
-      #raise SystemExit('Operand stack is empty.\n', 56)
       sys.stderr.write('Operand stack is empty.\n')
       exit(56)
 
@@ -305,29 +321,31 @@ class Stack():
 
   # Pops and operand and check if it is an integer type.
   def pop_and_check_int(self):
-    # TODO check var typu int: podle tohohle?
     try:
       (op, op_type) = self.operand_stack_pop()
     except SystemExit as ex:
-      raise ex
+      sys.stderr.write(ex.args[0])
+      exit(ex.args[1])
     if op_type == 'var':
       try:
         (op, op_type) = prog.get_var_value_type(op)
       except: # var value is None
-        raise SystemExit('Variable is not defined.\n', 54)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(54)
     if op_type != 'int':
-      raise SystemExit('Invalid operand type on the operand stack.\n', 53)
+      sys.stderr.write('Invalid operand type on the operand stack.\n')
+      exit(53)
     try:
       op = int(op)
     except ValueError:
-      raise SystemExit('Invalid operand type on the operand stack.\n', 53)
+      sys.stderr.write('Invalid operand type on the operand stack.\n')
+      exit(53)
     return op
 
   # Pops two operands from the stack and checks if their types are equal.
   def pop_2_check_types_eq(self):
     (val2, typ2) = self.operand_stack_pop()
     (val1, typ1) = self.operand_stack_pop()
-    # TODO pridano - check, jestli to funguje ok
     # if the operand is a variable -> get its value
     if typ1 == 'var':
       try:  
@@ -364,19 +382,8 @@ class Stack():
         exit(53) 
     elif typ1 == 'nil' or typ2 == 'nil':
       pass
-    # TODO myslim, ze tady taky staci jenom pass -> uz ukladam bool promenne spravne
     elif typ1 == typ2 == 'bool':
       pass
-      """
-      if val1.upper() == 'TRUE':
-        val1 = True
-      else:
-        val1 = False
-      if val2.upper() == 'TRUE':
-        val2 = True
-      else:
-        val2 = False
-      """
     else:
       sys.stderr.write('Wrong operand type on the operand stack.\n')
       exit(53)
@@ -397,7 +404,7 @@ class Argument:
       else:
         value = re.sub(r'\\([0-9]{3})', lambda x: chr(int(x[1])), value)
     if typ == 'bool':
-      if value.upper == 'TRUE':
+      if value.upper() == 'TRUE':
         value = True
       else:
         value = False
@@ -500,16 +507,25 @@ class Arithmetic(Instruction):
       except ValueError:
         sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
         exit(53) 
+        """
     elif typ1 == typ2 == 'nil':
       if val1 != 'nil' and val2 != 'nil':
         sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
         exit(53)
+        """
     elif typ1 == typ2 == 'bool':
       pass
+    elif typ1 == 'nil' or typ2 == 'nil':
+      if typ1 == 'nil' and val1 != 'nil':
+        sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+        exit(53)
+      if typ2 == 'nil' and val2 != 'nil':
+        sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+        exit(53)
     else:
       sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
       exit(53)
-    return (val1, val2, typ1)
+    return (val1, val2, typ1, typ2)
 
 # Class Move represents MOVE instruction.
 class Move(Instruction):
@@ -619,8 +635,7 @@ class Pushs(Instruction):
 
   # Pushes an operand to the operand stack.
   def execute(self):
-    # TODO musi zajistit, aby to melo spravny typ pti ukladani na stack
-    # not sure jestli tam ukladat GF@var nebo primo jeji hodnotu
+    # TODO not sure jestli tam ukladat GF@var nebo primo jeji hodnotu
     (value, typ) = self.get_arg_value(arg_num=1), self.get_arg_type(arg_num=1)
     stack.operand_stack_push((value, typ))
 
@@ -817,10 +832,12 @@ class Nots(Instruction):
     # je mam uz na stacku ulozene spravne, melo by toto byt nepotrebne
     # TODO check jestli je ukladam na stack spravne a mozna pridat 'pretypovani'
     # uz do ukladani argumentu v Instruction/Argument class
-    val_bool = False
-    if val.upper() == 'TRUE':
-      val_bool = True
-    result = not val_bool
+    # TODO opravit
+    #val_bool = False
+    #if val.upper() == 'TRUE':
+    #  val_bool = True
+    #result = not val_bool
+    result = not val
     stack.operand_stack_push((result, 'bool'))
 
 # Class Int2chars represents INT2CHARS instruction.
@@ -1047,9 +1064,10 @@ class Lt(Arithmetic):
   # Checks if arg2 value is lower than arg2 value and stores the boolean
   # result in variable specified by arg1.
   def execute(self):
-    (val1, val2, typ) = super().check_operand_type_eq()
-    if typ == 'nil':
-      sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+    (val1, val2, typ1, typ2) = super().check_operand_type_eq()
+    # nil is not supported in LT operation
+    if typ1 == 'nil' or typ2 == 'nil':
+      sys.stderr.write('LT: wrong operand type.\n')
       exit(53)
     result = val1 < val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
@@ -1064,9 +1082,10 @@ class Gt(Arithmetic):
   # Checks if arg2 value is greater than arg2 value and stores the boolean
   # result in variable specified by arg1.
   def execute(self):
-    (val1, val2, typ) = super().check_operand_type_eq()
-    if typ == 'nil':
-      sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+    (val1, val2, typ1, typ2) = super().check_operand_type_eq()
+    # nil is not supported in GT operation
+    if typ1 == 'nil' or typ2 == 'nil':
+      sys.stderr.write('GT: wrong operand type.\n')
       exit(53)
     result = val1 > val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
@@ -1081,9 +1100,9 @@ class Eq(Arithmetic):
   # Checks if arg2 value equals arg2 value and stores the boolean
   # result in variable specified by arg1.
   def execute(self):
-    (val1, val2, typ) = super().check_operand_type_eq()
+    (val1, val2, typ1, typ2) = super().check_operand_type_eq()
     result = False
-    if typ == 'nil' or val1 == val2:
+    if (typ1 == 'nil' and typ2 == 'nil') or val1 == val2:
       result = True
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
@@ -1097,9 +1116,9 @@ class And(Arithmetic):
   # Checks if the operands are booleans and executes and operation.
   # Boolean result is stored in a variable specified by arg1.
   def execute(self):
-    (val1, val2, typ) = super().check_operand_type_eq()
-    if typ != 'bool':
-      sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+    (val1, val2, typ1, typ2) = super().check_operand_type_eq()
+    if typ1 != 'bool' and typ2 != 'bool':
+      sys.stderr.write('AND: wrong operand type.\n')
       exit(53)
     result = val1 and val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
@@ -1114,9 +1133,9 @@ class Or(Arithmetic):
   # Checks if the operands are booleans and executes or operation.
   # Boolean result is stored in a variable specified by arg1.
   def execute(self):
-    (val1, val2, typ) = super().check_operand_type_eq()
-    if typ != 'bool':
-      sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+    (val1, val2, typ1, typ2) = super().check_operand_type_eq()
+    if typ1 != 'bool' and typ2 != 'bool':
+      sys.stderr.write('OR: wrong operand type.\n')
       exit(53)
     result = val1 or val2
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
@@ -1135,7 +1154,7 @@ class Not(Instruction):
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=2)
     if typ != 'bool':
-      sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
+      sys.stderr.write('NOT: wrong operand type.\n')
       exit(53)
     result = not val
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
@@ -1217,17 +1236,10 @@ class Read(Instruction):
       elif self.get_arg_value(arg_num=1) == 'string':
         inp = str(inp)
       elif self.get_arg_value(arg_num=1) == 'bool':
-        # TODO store it as True and False, ne?
         if inp.upper() == 'TRUE':
           inp = True
         else:
           inp = False
-        """
-        if inp.upper() == 'TRUE':
-          inp = 'true'
-        else:
-          inp = 'false'
-        """
     except ValueError:  # invalid input
       inp = None
     prog.set_var_value(self.get_arg_value(arg_num=1), (inp, self.get_arg_value(arg_num=2)))
@@ -1265,8 +1277,8 @@ class Concat(Arithmetic):
 
   # Concatenates two strings and stores it to the variable specified by arg1.
   def execute(self):
-    (val1, val2, typ) = super().check_operand_type_eq()
-    if typ != 'string':
+    (val1, val2, typ1, typ2) = super().check_operand_type_eq()
+    if typ1 != 'string' and typ2 != 'string':
       sys.stderr.write('CONCAT: wrong operand type.\n')
       exit(53)
     try:
