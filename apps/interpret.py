@@ -47,11 +47,15 @@ class Program:
       exit(52)
     self._label_dict[name] = order
 
-  # Returns order of the label specified by label_name.
-  def get_label_order(self, label_name):
+  # Checks if label is defined.
+  def check_if_label_exists(self, label_name):
     if not label_name in self._label_dict:
       sys.stderr.write('Label ' + label_name + ' doesn\'t exist.\n')
       exit(52)
+
+  # Returns order of the label specified by label_name.
+  def get_label_order(self, label_name):
+    self.check_if_label_exists(label_name)
     return self._label_dict[label_name]
 
   # Returns current instruction order.
@@ -239,19 +243,26 @@ class Frame:
   def set_var_value(self, name, value, valtype):
     # check if the var exists in the frame dictionary
     name = name[3:]
-    try:
-      if valtype == 'var':
-        frame = prog.get_frame(value)
-        self._frame_dict[name] = (frame.get_var_value(value[3:]), 'var')
-      else:
-        # set the variable to (value, valtype)
-        self._frame_dict[name] = (value, valtype)
-    except KeyError:    # var is not in the frame dictionary
+    if name not in self._frame_dict:
       raise SystemExit('Var ' + name + ' is not declared.\n', 54)
-    except SystemExit as ex:  # exception from frame.get_var_value
-      raise ex
-    except:  # var is not defined
-      raise SystemExit('Var ' + name + ' is not defined.\n', 56)
+    # check the value that should be set
+    if valtype == 'var':
+      try:
+        frame = prog.get_frame(value)
+      except SystemExit as ex:  # exception from frame.get_var_value
+        raise ex
+      try:
+        self._frame_dict[name] = (frame.get_var_value(value[3:]), 'var')
+      except KeyError:    # var is not in the frame dictionary
+        raise SystemExit('Var ' + name + ' is not declared.\n', 54)
+      except SystemExit as ex:  # exception from frame.get_var_value
+        raise ex
+    else:
+      # set the variable to (value, valtype)
+      try:
+        self._frame_dict[name] = (value, valtype)
+      except:    # var is not in the frame dictionary
+        raise SystemExit('Var ' + name + ' is not declared.\n', 54)
 
   # Returns the value of a variable specified by 'name'.
   def get_var_value(self, name):
@@ -389,6 +400,11 @@ class Argument:
       # convert escape sequences
       else:
         value = re.sub(r'\\([0-9]{3})', lambda x: chr(int(x[1])), value)
+    if typ == 'bool':
+      if value.upper == 'TRUE':
+        value = True
+      else:
+        value = False
     self._value = value
     self._typ = typ
 
@@ -477,8 +493,8 @@ class Arithmetic(Instruction):
         sys.stderr.write(self.get_opcode() + ': Variable is not defined.\n')
         exit(56)
     if typ2 == 'var':
-      try:  # muze byt None
-        (val1, typ1) = prog.get_var_value_type(val1)
+      try:
+        (val2, typ2) = prog.get_var_value_type(val2)
       except TypeError:   # variable is not defined (exit 56)
         sys.stderr.write(self.get_opcode() + ': Variable is not defined.\n')
         exit(56)
@@ -502,8 +518,7 @@ class Arithmetic(Instruction):
         sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
         exit(53)
     elif typ1 == typ2 == 'bool':
-      pass
-      # TODO - uz by mely byl ulozene spravne
+      # TODO fakt by to uz nemelo byt potreba
       """
       if val1.upper() == 'TRUE':
         val1 = True
@@ -513,7 +528,7 @@ class Arithmetic(Instruction):
         val2 = True
       else:
         val2 = False
-      """
+        """
     else:
       sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
       exit(53)
@@ -530,6 +545,7 @@ class Move(Instruction):
 
   # Moves the value in arg_num=2 to arg_num=1.
   def execute(self):
+    # TODO opravit
     prog.set_var_value(self.get_arg_value(arg_num=1), self.get_arg_value_type(arg_num=2))
 
 # Class Createframe represents CREATEFRAME instruction.
@@ -577,6 +593,7 @@ class Defvar(Instruction):
   # Declares a new variable with None value.
   def execute(self):
     # TODO zkusit exceptions - jestli se to fakt ukonci nebo ne
+    # TODO opravit
     prog.set_var(self.get_arg_value_type(arg_num=1))
     
 # Class Call represents CALL instruction.
@@ -629,6 +646,7 @@ class Pops(Instruction):
 
   # Pops an operand from the operand stack and stores it in a variable.
   def execute(self):
+    # TODO opravit
     (name, typ) = self.get_arg_value_type(arg_num=1)
     prog.set_var_value(name, stack.operand_stack_pop())
     
@@ -888,6 +906,9 @@ class Jumpifeqs(Instruction):
   # Pops two operands from the operand stack, checks if they are equal
   # and if they are, jumps to the label specified by arg1.
   def execute(self):
+    # check if the label is defined -> if not exit(52)
+    prog.check_if_label_exists(self.get_arg_value(arg_num=1))
+    # check operands
     (symb2_val, symb2_typ) = stack.operand_stack_pop()
     (symb1_val, symb1_typ) = stack.operand_stack_pop()
     # if the symbol is a variable, get its value and type
@@ -932,6 +953,9 @@ class Jumpifneqs(Instruction):
   # Pops two operands from the operand stack, checks if they are equal
   # and if they are not equal, jumps to the label specified by arg1.
   def execute(self):
+    # check if the label is defined -> if not exit(52)
+    prog.check_if_label_exists(self.get_arg_value(arg_num=1))
+    # check operands
     (symb2_val, symb2_typ) = stack.operand_stack_pop()
     (symb1_val, symb1_typ) = stack.operand_stack_pop()
     # if the symbol is a variable, get its value and type
@@ -959,7 +983,6 @@ class Jumpifneqs(Instruction):
       if symb1_val != symb2_val:
         prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
     elif symb1_typ == 'nil' or symb2_typ == 'nil':
-      #print('Not sure co s tim nilem')
       if symb1_typ != symb2_typ:
         prog.set_instr_counter(prog.get_label_order(self.get_arg_value(arg_num=1)))
     else:
@@ -1124,13 +1147,21 @@ class Not(Instruction):
   # Boolean result is stored in a variable specified by arg1.
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=2)
+    if typ == 'var':
+      try:
+        (val, typ) = prog.get_var_value_type(val)
+      except TypeError:   # variable is not defined (exit 56)
+        sys.stderr.write(self.get_opcode() + ': Variable is not defined.\n')
+        exit(56)
     if typ != 'bool':
       sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
       exit(53)
+    """
     val_bool = False
     if val.upper() == 'TRUE':
       val_bool = True
-    result = not val_bool
+    """
+    result = not val
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
 # Class represents INT2CHAR instruction.
@@ -1231,9 +1262,15 @@ class Read(Instruction):
       elif self.get_arg_value(arg_num=1) == 'bool':
         # TODO store it as True and False, ne?
         if inp.upper() == 'TRUE':
+          inp = True
+        else:
+          inp = False
+        """
+        if inp.upper() == 'TRUE':
           inp = 'true'
         else:
           inp = 'false'
+        """
     except ValueError:  # invalid input
       inp = None
     prog.set_var_value(self.get_arg_value(arg_num=1), (inp, self.get_arg_value(arg_num=2)))
@@ -1253,7 +1290,6 @@ class Write(Instruction):
       var_name = val
       try:
         (val, typ) = prog.get_var_value_type(val)
-      # TODO ma tady teda byt SystemExit exception nebo ne? :reee:
       except TypeError: # NoneType -> variable is not defined (exit 56)
         sys.stderr.write('Variable is not defined.\n')
         exit(56)
@@ -1350,9 +1386,12 @@ class Getchar(Arithmetic):
       exit(53)
     try:
       result = val1[int(val2)]
-    except:   # index out of range
+    except IndexError:   # index out of range
       sys.stderr.write('GETCHAR: Index out of range.\n')
       exit(58)
+    except:   # invalid type
+      sys.stderr.write('Invalid operand type.\n')
+      exit(53)
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'string'))
 
 # Class Setchar represents SETCHAR instruction. 
@@ -1384,6 +1423,7 @@ class Setchar(Arithmetic):
     if typ != 'var' and symb1_typ != 'int' and symb2_typ != 'string':
       sys.stderr.write('SETCHAR: wrong operand type.\n')
       exit(53)
+    # TODO opravit get_var_value - zjistit, jestli mam funkci get_arg_type() -> ta by vracela proste 'var'
     try:
       (var_val, var_typ) = prog.get_var_value_type(var)
     except TypeError: # NoneType -> variable is not defined (exit 56)
@@ -1461,6 +1501,9 @@ class Jumpifeq(Instruction):
   # Checks if arg2 and arg3 are equal and if they are, jumps 
   # to the label specified by arg1.
   def execute(self):
+    # check if the label is defined -> if not exit(52)
+    prog.check_if_label_exists(self.get_arg_value(arg_num=1))
+    # check operands
     (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
     (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
     if symb1_typ == 'var':
@@ -1506,6 +1549,9 @@ class Jumpifneq(Instruction):
   # Checks if arg2 and arg3 are equal and if they are not, jumps 
   # to the label specified by arg1.
   def execute(self):
+    # check if the label is defined -> if not exit(52)
+    prog.check_if_label_exists(self.get_arg_value(arg_num=1))
+    # check operands
     (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
     (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
     if symb1_typ == 'var':
@@ -1548,16 +1594,25 @@ class Exit(Instruction):
   # Exits the program with a specified exit number.
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=1)
+    if typ == 'var':
+      try:
+        (val, typ) = prog.get_var_value_type(val)
+      except TypeError: # NoneType -> variable is not defined (exit 56)
+        sys.stderr.write('Variable is not defined.\n')
+        exit(56)
     try:
       exit_code = int(val)
     except ValueError:
       sys.stderr.write('Invalid EXIT number.\n')
-      exit(57)
-    if typ != 'int' or exit_code < 0 or exit_code > 49:
+      exit(53)
+    if typ != 'int':
+      sys.stderr.write('Invalid EXIT number.\n')
+      exit(53)
+    # integer number must be 0 - 49 -> else exit(57)
+    if exit_code < 0 or exit_code > 49:
       sys.stderr.write('Invalid EXIT number.\n')
       exit(57)
     else:
-      # TODO osetrit uzavreni souboru atd.
       exit(exit_code)
 
 # Class Dprint represents DPRINT instruction.
