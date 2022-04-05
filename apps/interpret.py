@@ -249,7 +249,7 @@ class Frame:
       except SystemExit as ex:  # exception from frame.get_var_value
         raise ex
       try:
-        self._frame_dict[name] = (frame.get_var_value(value[3:]), 'var')
+        self._frame_dict[name] = (frame.get_var_value(value[3:]), valtype)
       except KeyError:    # var is not in the frame dictionary
         raise SystemExit('Var ' + name + ' is not declared.\n', 54)
       except SystemExit as ex:  # exception from frame.get_var_value
@@ -545,9 +545,7 @@ class Move(Instruction):
     if self.get_arg_type(arg_num=1) != 'var':
       sys.stderr.write('MOVE: Invalid operand\n')
       exit(53)
-    # value and type to be set
-    (value, typ) = self.get_arg_value(arg_num=2), self.get_arg_type(arg_num=2)
-    prog.set_var_value(self.get_arg_value(arg_num=1), (value, typ))
+    prog.set_var_value(self.get_arg_value(arg_num=1), self.get_arg_value_type(arg_num=2))
 
 # Class Createframe represents CREATEFRAME instruction.
 class Createframe(Instruction):
