@@ -96,8 +96,7 @@ class Program:
 
   # Declares new variable (the type must be 'var').
   # Value and type of the variable is set to None.
-  def set_var(self, name_type):
-    name, typ = (name_type)
+  def set_var(self, name):
     try:
       frame = self.get_frame(name)
     except SystemExit as ex:
@@ -105,7 +104,7 @@ class Program:
       exit(ex.args[1])
     # declare new variable in the frame
     try:
-      frame.set_var(name, typ)
+      frame.set_var(name)
     except SystemExit as ex:
       sys.stderr.write(ex.args[0])
       exit(ex.args[1])
@@ -228,10 +227,7 @@ class Frame:
 
   # Declares new variable (the type must be 'var').
   # Value and type of the variable is set to None.
-  def set_var(self, name, typ):
-    # check if the type is var
-    if typ != 'var':
-      raise SystemExit('Invalid operand type.\n', 53)
+  def set_var(self, name):
     # check if the variable is in the frame dictionary
     name = name[3:]
     if name in self._frame_dict:
@@ -440,9 +436,21 @@ class Instruction:
   def get_arg_value(self, arg_num):
     return self._args[arg_num - 1].get_value()
 
+  # Returns type of the argument.
+  def get_arg_type(self, arg_num):
+    return self._args[arg_num - 1].get_type()
+
   # Returns value and type of the argument as a tuple (value, type).
+  # If the argument is of type var, it returns its real value and type.
   def get_arg_value_type(self, arg_num):
-    return self._args[arg_num - 1].get_value(), self._args[arg_num - 1].get_type()
+    (value, typ) = self._args[arg_num - 1].get_value(), self._args[arg_num - 1].get_type()
+    if typ == 'var':
+      try:
+        (value, typ) = prog.get_var_value_type(value)
+      except TypeError:   # variable is not defined (exit 56)
+        sys.stderr.write('Variable ' + value + ' is not defined.\n')
+        exit(56)
+    return (value, typ)
 
 
 # Class Arithmetic is inherited from Instruction class.
@@ -460,14 +468,6 @@ class Arithmetic(Instruction):
   # Checks if the operand is integer and returns it.
   def get_check_int_operand(self, arg_num):
     (val, typ) = self.get_arg_value_type(arg_num=arg_num)
-    # if the argument is variable -> get its value and type
-    if typ == 'var':
-      try:
-        var_name = val
-        (val, typ) = prog.get_var_value_type(val)
-      except TypeError:   # variable is not defined (exit 56)
-        sys.stderr.write('Variable ' + var_name + ' is not defined.\n')
-        exit(56)
     # check integer type
     if typ != 'int':
       sys.stderr.write(self.get_opcode() + ': wrong argument type.\n')
@@ -485,19 +485,6 @@ class Arithmetic(Instruction):
     # get operands types and values
     (val1, typ1) = self.get_arg_value_type(arg_num=2)
     (val2, typ2) = self.get_arg_value_type(arg_num=3)
-    # if the operand is variable -> get its value and type
-    if typ1 == 'var':
-      try:
-        (val1, typ1) = prog.get_var_value_type(val1)
-      except TypeError:   # variable is not defined (exit 56)
-        sys.stderr.write(self.get_opcode() + ': Variable is not defined.\n')
-        exit(56)
-    if typ2 == 'var':
-      try:
-        (val2, typ2) = prog.get_var_value_type(val2)
-      except TypeError:   # variable is not defined (exit 56)
-        sys.stderr.write(self.get_opcode() + ': Variable is not defined.\n')
-        exit(56)
     # check types equality
     if typ1 == typ2 == 'int':
       try:
@@ -518,17 +505,7 @@ class Arithmetic(Instruction):
         sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
         exit(53)
     elif typ1 == typ2 == 'bool':
-      # TODO fakt by to uz nemelo byt potreba
-      """
-      if val1.upper() == 'TRUE':
-        val1 = True
-      else:
-        val1 = False
-      if val2.upper() == 'TRUE':
-        val2 = True
-      else:
-        val2 = False
-        """
+      pass
     else:
       sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
       exit(53)
@@ -546,7 +523,12 @@ class Move(Instruction):
   # Moves the value in arg_num=2 to arg_num=1.
   def execute(self):
     # TODO opravit
-    prog.set_var_value(self.get_arg_value(arg_num=1), self.get_arg_value_type(arg_num=2))
+    if self.get_arg_type(arg_num=1) != 'var':
+      sys.stderr.write('MOVE: Invalid operand\n')
+      exit(53)
+    # value and type to be set
+    (value, typ) = self.get_arg_value(arg_num=2), self.get_arg_type(arg_num=2)
+    prog.set_var_value(self.get_arg_value(arg_num=1), (value, typ))
 
 # Class Createframe represents CREATEFRAME instruction.
 class Createframe(Instruction):
@@ -594,7 +576,11 @@ class Defvar(Instruction):
   def execute(self):
     # TODO zkusit exceptions - jestli se to fakt ukonci nebo ne
     # TODO opravit
-    prog.set_var(self.get_arg_value_type(arg_num=1))
+    (var_name, typ) = self.get_arg_value(arg_num=1), self.get_arg_type(arg_num=1)
+    if typ != 'var':
+      sys.stderr.write('DEFVAR: Invalid operand.\n')
+      exit(53)
+    prog.set_var(var_name)
     
 # Class Call represents CALL instruction.
 class Call(Instruction):
@@ -634,7 +620,9 @@ class Pushs(Instruction):
   # Pushes an operand to the operand stack.
   def execute(self):
     # TODO musi zajistit, aby to melo spravny typ pti ukladani na stack
-    stack.operand_stack_push(self.get_arg_value_type(arg_num=1))
+    # not sure jestli tam ukladat GF@var nebo primo jeji hodnotu
+    (value, typ) = self.get_arg_value(arg_num=1), self.get_arg_type(arg_num=1)
+    stack.operand_stack_push((value, typ))
 
 # Class Pops represents POPS instruction.
 class Pops(Instruction):
@@ -646,8 +634,7 @@ class Pops(Instruction):
 
   # Pops an operand from the operand stack and stores it in a variable.
   def execute(self):
-    # TODO opravit
-    (name, typ) = self.get_arg_value_type(arg_num=1)
+    name = self.get_arg_value(arg_num=1)
     prog.set_var_value(name, stack.operand_stack_pop())
     
 # Class Clears represents CLEARS instruction.
@@ -1147,20 +1134,9 @@ class Not(Instruction):
   # Boolean result is stored in a variable specified by arg1.
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=2)
-    if typ == 'var':
-      try:
-        (val, typ) = prog.get_var_value_type(val)
-      except TypeError:   # variable is not defined (exit 56)
-        sys.stderr.write(self.get_opcode() + ': Variable is not defined.\n')
-        exit(56)
     if typ != 'bool':
       sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
       exit(53)
-    """
-    val_bool = False
-    if val.upper() == 'TRUE':
-      val_bool = True
-    """
     result = not val
     prog.set_var_value(self.get_arg_value(arg_num=1), (result, 'bool'))
 
@@ -1177,13 +1153,6 @@ class Int2char(Instruction):
   # and stores the string result in a variable specified by arg1.
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=2)
-    # if the operand is a variable, get its value and type
-    if typ == 'var':
-      try:
-        (val, typ) = prog.get_var_value_type(val)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
     if typ != 'int':
       sys.stderr.write('INT2CHAR: Invalid integer value.\n')
       exit(58)
@@ -1210,18 +1179,6 @@ class Stri2int(Instruction):
   def execute(self):
     (val1, typ1) = self.get_arg_value_type(arg_num=2)
     (val2, typ2) = self.get_arg_value_type(arg_num=3)
-    if typ1 == 'var':
-      try:
-        (val1, typ1) = prog.get_var_value_type(val1)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
-    if typ2 == 'var':
-      try:
-        (val1, typ1) = prog.get_var_value_type(val1)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
     # check the types
     if typ1 != 'string' and typ2 != 'int':
       sys.stderr.write('STRI2INT: Invalid operand type.\n')
@@ -1286,13 +1243,6 @@ class Write(Instruction):
   # Prints the value specified by arg1 to the stdout.
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=1)
-    if typ == 'var':
-      var_name = val
-      try:
-        (val, typ) = prog.get_var_value_type(val)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
     # convert the value and print it
     if typ == 'nil':
       print('', end='')
@@ -1339,12 +1289,6 @@ class Strlen(Instruction):
   # Stores the length of arg2 string into the variable specified by arg1.
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=2)
-    if typ == 'var':
-      try:
-        (val, typ) = prog.get_var_value_type(val)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
     if typ != 'string':
       sys.stderr.write('STRLEN: wrong operand type.\n')
       exit(53)
@@ -1368,18 +1312,6 @@ class Getchar(Arithmetic):
   def execute(self):
     (val1, typ1) = self.get_arg_value_type(arg_num=2)
     (val2, typ2) = self.get_arg_value_type(arg_num=3)
-    if typ1 == 'var':
-      try:
-        (val1, typ1) = prog.get_var_value_type(val1)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
-    if typ2 == 'var':
-      try:
-        (val2, typ2) = prog.get_var_value_type(val2)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
     # check the types
     if typ1 != 'string' and typ2 != 'int':
       sys.stderr.write('GETCHAR: Invalid operand type.\n')
@@ -1404,26 +1336,19 @@ class Setchar(Arithmetic):
   # Modifies a character in arg1 variable on index arg2 to the character 
   # specified by arg3.
   def execute(self):
-    (var, typ) = self.get_arg_value_type(arg_num=1)
-    (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
-    (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
-    if symb1_typ == 'var':
-      try:
-        (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
-    if symb2_typ == 'var':
-      try:
-        (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
-    # check the types
-    if typ != 'var' and symb1_typ != 'int' and symb2_typ != 'string':
+    # check if the first operand is a variable
+    if self.get_arg_type(arg_num=1) != 'var':
       sys.stderr.write('SETCHAR: wrong operand type.\n')
       exit(53)
-    # TODO opravit get_var_value - zjistit, jestli mam funkci get_arg_type() -> ta by vracela proste 'var'
+    # get values of the operands
+    var = self.get_arg_value(arg_num=1)
+    (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
+    (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
+    # check the types
+    if symb1_typ != 'int' and symb2_typ != 'string':
+      sys.stderr.write('SETCHAR: wrong operand type.\n')
+      exit(53)
+    # get value of the variable var
     try:
       (var_val, var_typ) = prog.get_var_value_type(var)
     except TypeError: # NoneType -> variable is not defined (exit 56)
@@ -1452,17 +1377,17 @@ class Type(Instruction):
     self.set_arg(1, arg1v, arg1t)
     self.set_arg(2, arg2v, arg2t)
 
+  # TODO opravit type
   # Gets the type of arg2 and stores it as a string to a variable specified by arg
   def execute(self):
-    (symb_val, symb_typ) = self.get_arg_value_type(arg_num=2)
-    if symb_typ == 'var':
+    typ = self.get_arg_type(arg_num=2)
+    if typ == 'var':
       try:
-        (var_val, var_typ) = prog.get_var_value_type(symb_val)
-        symb_typ = var_typ
+        (var_name, typ) = prog.get_var_value_type(self.get_arg_value(arg_num=2))
       except TypeError: # NoneType -> variable is not defined -> string = ''
-        symb_typ = '' 
-    prog.set_var_value(self.get_arg_value(arg_num=1), (symb_typ, 'string'))
-    
+        typ = '' 
+    prog.set_var_value(self.get_arg_value(arg_num=1), (typ, 'string'))
+
 # Class Label represents LABEL instruction.
 class Label(Instruction):
 
@@ -1506,18 +1431,6 @@ class Jumpifeq(Instruction):
     # check operands
     (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
     (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
-    if symb1_typ == 'var':
-      try:
-        (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
-    if symb2_typ == 'var':
-      try:
-        (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
     # check the types and values
     if symb1_typ == symb2_typ:
       if symb1_typ == 'int':
@@ -1554,18 +1467,6 @@ class Jumpifneq(Instruction):
     # check operands
     (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
     (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
-    if symb1_typ == 'var':
-      try:
-        (symb1_val, symb1_typ) = prog.get_var_value_type(symb1_val)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
-    if symb2_typ == 'var':
-      try:
-        (symb2_val, symb2_typ) = prog.get_var_value_type(symb2_val)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
     if symb1_typ == symb2_typ:
       if symb1_typ == 'int':
         try:
@@ -1594,12 +1495,6 @@ class Exit(Instruction):
   # Exits the program with a specified exit number.
   def execute(self):
     (val, typ) = self.get_arg_value_type(arg_num=1)
-    if typ == 'var':
-      try:
-        (val, typ) = prog.get_var_value_type(val)
-      except TypeError: # NoneType -> variable is not defined (exit 56)
-        sys.stderr.write('Variable is not defined.\n')
-        exit(56)
     try:
       exit_code = int(val)
     except ValueError:
