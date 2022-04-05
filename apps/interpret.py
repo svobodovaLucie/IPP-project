@@ -791,7 +791,7 @@ class Ands(Instruction):
   # and pushes the boolean result back to the stack.
   def execute(self):
     (val1, val2, typ1, typ2) =  stack.pop_2_check_types_eq()
-    if typ1 != 'bool' and typ2 != 'bool':
+    if typ1 != 'bool' or typ2 != 'bool':
       sys.stderr.write('ANDS: wrong operand type on the operand stack.\n')
       exit(53)
     result = val1 and val2
@@ -808,7 +808,7 @@ class Ors(Instruction):
   # and pushes the boolean result back to the stack.
   def execute(self):
     (val1, val2, typ1, typ2) =  stack.pop_2_check_types_eq()
-    if typ1 != 'bool' and typ2 != 'bool':
+    if typ1 != 'bool' or typ2 != 'bool':
       sys.stderr.write('ORS: wrong operand type on the operand stack.\n')
       exit(53)
     result = val1 or val2
@@ -1117,7 +1117,7 @@ class And(Arithmetic):
   # Boolean result is stored in a variable specified by arg1.
   def execute(self):
     (val1, val2, typ1, typ2) = super().check_operand_type_eq()
-    if typ1 != 'bool' and typ2 != 'bool':
+    if typ1 != 'bool' or typ2 != 'bool':
       sys.stderr.write('AND: wrong operand type.\n')
       exit(53)
     result = val1 and val2
@@ -1134,7 +1134,7 @@ class Or(Arithmetic):
   # Boolean result is stored in a variable specified by arg1.
   def execute(self):
     (val1, val2, typ1, typ2) = super().check_operand_type_eq()
-    if typ1 != 'bool' and typ2 != 'bool':
+    if typ1 != 'bool' or typ2 != 'bool':
       sys.stderr.write('OR: wrong operand type.\n')
       exit(53)
     result = val1 or val2
@@ -1199,7 +1199,7 @@ class Stri2int(Instruction):
     (val1, typ1) = self.get_arg_value_type(arg_num=2)
     (val2, typ2) = self.get_arg_value_type(arg_num=3)
     # check the types
-    if typ1 != 'string' and typ2 != 'int':
+    if typ1 != 'string' or typ2 != 'int':
       sys.stderr.write('STRI2INT: Invalid operand type.\n')
       exit(53)
     try:
@@ -1278,7 +1278,7 @@ class Concat(Arithmetic):
   # Concatenates two strings and stores it to the variable specified by arg1.
   def execute(self):
     (val1, val2, typ1, typ2) = super().check_operand_type_eq()
-    if typ1 != 'string' and typ2 != 'string':
+    if typ1 != 'string' or typ2 != 'string':
       sys.stderr.write('CONCAT: wrong operand type.\n')
       exit(53)
     try:
@@ -1325,7 +1325,7 @@ class Getchar(Arithmetic):
     (val1, typ1) = self.get_arg_value_type(arg_num=2)
     (val2, typ2) = self.get_arg_value_type(arg_num=3)
     # check the types
-    if typ1 != 'string' and typ2 != 'int':
+    if typ1 != 'string' or typ2 != 'int':
       sys.stderr.write('GETCHAR: Invalid operand type.\n')
       exit(53)
     try:
@@ -1357,7 +1357,7 @@ class Setchar(Arithmetic):
     (symb1_val, symb1_typ) = self.get_arg_value_type(arg_num=2)
     (symb2_val, symb2_typ) = self.get_arg_value_type(arg_num=3)
     # check the types
-    if symb1_typ != 'int' and symb2_typ != 'string':
+    if symb1_typ != 'int' or symb2_typ != 'string':
       sys.stderr.write('SETCHAR: wrong operand type.\n')
       exit(53)
     # get value of the variable var
