@@ -510,12 +510,6 @@ class Arithmetic(Instruction):
       except ValueError:
         sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
         exit(53) 
-        """
-    elif typ1 == typ2 == 'nil':
-      if val1 != 'nil' and val2 != 'nil':
-        sys.stderr.write(self.get_opcode() + ': wrong operand type.\n')
-        exit(53)
-        """
     elif typ1 == typ2 == 'bool':
       pass
     elif typ1 == 'nil' or typ2 == 'nil':
@@ -636,9 +630,7 @@ class Pushs(Instruction):
 
   # Pushes an operand to the operand stack.
   def execute(self):
-    # TODO not sure jestli tam ukladat GF@var nebo primo jeji hodnotu
-    (value, typ) = self.get_arg_value(arg_num=1), self.get_arg_type(arg_num=1)
-    stack.operand_stack_push((value, typ))
+    stack.operand_stack_push(self.get_arg_value_type(arg_num=1))
 
 # Class Pops represents POPS instruction.
 class Pops(Instruction):
