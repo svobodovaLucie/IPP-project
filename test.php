@@ -126,7 +126,7 @@ function parse_arg($argv) {
     "jexampath:",
     "noclean",
   );
-  $options = getopt(NULL, $longopts, $restindex);
+  $options = getopt("", $longopts, $restindex);
 
   // check if there is a --help option -> print help
   if (array_key_exists('help', $options)) {
@@ -142,7 +142,8 @@ function parse_arg($argv) {
       (array_key_exists('parse-only', $options) && 
         (array_key_exists('int-only', $options) || array_key_exists('int-script', $options))) ||
       (array_key_exists('int-only', $options) && 
-        (array_key_exists('parse-only', $options) || array_key_exists('parse-script', $options)))) {
+        (array_key_exists('parse-only', $options) || array_key_exists('parse-script', $options) 
+        || array_key_exists('jexampath', $options)))) {
     fprintf(STDERR, "Invalid combination of command line arguments.\n");
     exit(10);
   }
@@ -151,8 +152,10 @@ function parse_arg($argv) {
   check_directory();
   check_parse_script();
   check_int_script();
-  check_jexampath();
-}
+  if (!(array_key_exists('int-only', $options))) {
+    check_jexampath();
+  }
+}  
 
 /**
  * Function generates the main HTML structure with CSS style.
@@ -474,7 +477,7 @@ function exec_parser($file, $test_num) {
   $script = $options["parse-script"];
   $output = array();
   $return_val = NULL;
-  exec("php8.1 $script <$file.src >$file.out_parse_tmp", $output, $return_val);
+  exec("php8.1 $script <$file.src >$file.out_parse_tmp 2>/dev/null", $output, $return_val);
 
   // get the expected return value
   $rc_exp = trim(file_get_contents($file.".rc"));
@@ -540,11 +543,11 @@ function exec_int($file, $test_num) {
   $return_val = NULL;
   if (array_key_exists('int-only', $options)) {
     // int-only tests -> input is test.src file
-    exec("python3.8 $script --source=$file.src --input=$file.in >$file.out_int_tmp", 
+    exec("python3.8 $script --source=$file.src --input=$file.in >$file.out_int_tmp 2>/dev/null", 
           $output, $return_val);
   } else {
     // testing both parser and interpret -> input is test.out_parse_tmp file
-    exec("python3.8 $script --source=$file.out_parse_tmp --input=$file.in >$file.out_int_tmp",
+    exec("python3.8 $script --source=$file.out_parse_tmp --input=$file.in >$file.out_int_tmp 2>/dev/null",
           $output, $return_val);
   }
 
