@@ -70,7 +70,8 @@ function check_parse_script() {
   global $options;
   if (!(array_key_exists('parse-script', $options))) {
     $options['parse-script'] = "parse.php";
-  } else if (!(is_file($options['parse-script']))) {
+  }
+  if (!(is_file($options['parse-script']))) {
     fwrite(STDERR, "--parse-script file does not exist.\n");
     exit(41);
   }
@@ -84,7 +85,8 @@ function check_int_script() {
   global $options;
   if (!(array_key_exists('int-script', $options))) {
     $options['int-script'] = "interpret.py";
-  } else if (!(is_file($options['int-script']))) {
+  }
+  if (!(is_file($options['int-script']))) {
     fwrite(STDERR, "--int-script file does not exist.\n");
     exit(41);
   }
@@ -150,10 +152,14 @@ function parse_arg($argv) {
 
   // check the args and set the default values
   check_directory();
-  check_parse_script();
-  check_int_script();
+
   if (!(array_key_exists('int-only', $options))) {
+    check_parse_script();
     check_jexampath();
+  }
+  
+  if (!(array_key_exists('parse-only', $options))) {
+    check_int_script();
   }
 }  
 
