@@ -7,7 +7,7 @@
  *                  2021/2022                      *
  * *********************************************** */
 /**
- * Test script for testing IPP project - parse.php and interpret.py.
+ * Test script for testing IPP project - parser (parse.php) and interpret (interpret.py).
  */
 
 /* print warnings to stderr */
@@ -18,7 +18,7 @@ ini_set('display_errors', 'stderr');
  */
 function print_help() {
   echo "
-Test script for testing IPP project - parse.php and interpret.py.
+Test script for testing IPP project - parser (parse.php) and interpret (interpret.py).
 Usage:
 php8.1 test.php [--help] [--directory=path] [--recursive] [--parse-script=file]
                 [--int-script=file] [--parse-only] [--int-only] [--jexampath=path] [--noclean]
@@ -53,10 +53,12 @@ $failed = 0;                // the number of failed tests
 function check_directory() {
   global $options;
   if (!(array_key_exists('directory', $options))) {
-    $options['directory'] = ".";
-  } else if (!(file_exists($options['directory']))) {
+    $options['directory'] = "./";
+  } else if (!(file_exists($options['directory'])) || is_file($options['directory'])) {
       fwrite(STDERR, "--directory does not exist.\n");
       exit(41);
+  } else if ($options['directory'][strlen($options['directory'])-1] != '/') {
+    $options['directory'] .= '/';
   }
 }
 
@@ -68,8 +70,7 @@ function check_parse_script() {
   global $options;
   if (!(array_key_exists('parse-script', $options))) {
     $options['parse-script'] = "parse.php";
-  } else if (!(file_exists($options['parse-script'])) || 
-      (preg_match("/parse.php$/", $options['parse-script'])) != 1) {
+  } else if (!(is_file($options['parse-script']))) {
     fwrite(STDERR, "--parse-script file does not exist.\n");
     exit(41);
   }
@@ -83,8 +84,7 @@ function check_int_script() {
   global $options;
   if (!(array_key_exists('int-script', $options))) {
     $options['int-script'] = "interpret.py";
-  } else if (!(file_exists($options['int-script'])) || 
-  (preg_match("/interpret.py$/", $options['int-script'])) != 1) {
+  } else if (!(is_file($options['int-script']))) {
     fwrite(STDERR, "--int-script file does not exist.\n");
     exit(41);
   }
@@ -101,7 +101,7 @@ function check_jexampath() {
   } elseif ($options['jexampath'][strlen($options['jexampath'])-1] != '/') {
       $options['jexampath'] .= '/';
   }
-  if (!(file_exists($options['jexampath']."jexamxml.jar"))) {
+  if (!(is_file($options['jexampath']."jexamxml.jar"))) {
     fwrite(STDERR, $options['jexampath']. " directory does not contain jexamxml.jar file.\n");
     exit(41);
   }
@@ -130,10 +130,10 @@ function parse_arg($argv) {
 
   // check if there is a --help option -> print help
   if (array_key_exists('help', $options)) {
-    print_help();
     if (count($argv) != 2) {
       exit(10);
     }
+    print_help();
     exit(0);
   }
 
@@ -345,11 +345,12 @@ function html_add_test_log($test_num, $test_spec, $result) {
  * @param $suffix suffix in ".in", ".out", ".rc"
  */
 function generate_file($file_name, $suffix) {
+  global $options;
   $output = array();
   $return_val = NULL;
 
   // if the file exists -> return
-  exec("find | grep ".$file_name.$suffix, $output, $return_val);
+  exec("find " . $options['directory'] . " | grep ".$file_name.$suffix, $output, $return_val);
   if ($return_val == 0) {
     return;
   }
@@ -598,18 +599,24 @@ function nonrecursive_tests() {
   global $options;
   global $failed;
   $test_num = 0;
-  
-  // get all files in the current directory
-  $fileList = glob($options['directory']."/*");
+
+  // construct the directory iterator
+  try {
+    $it = new DirectoryIterator($options['directory']);
+  } catch (Exception $e) {
+    fwrite(STDERR, "Failed to open the directory ". $options['directory'] .".\n");
+    exit(41);
+  }
 
   // iterate through the files and execute the tests
-  foreach($fileList as $file){
+  foreach ($it as $file) {
     // skip all directories, hidden files and other than .src files
-    if(!is_file($file) || (preg_match("/^\./", $file) == 1) || (preg_match("/\.src$/", $file) != 1)) {
+    $filePath = $options['directory'].$file;
+    if(!is_file($filePath) || (preg_match("/^\./", $file) == 1) || (preg_match("/\.src$/", $file) != 1)) {
       continue;
     }
     $test_num++;
-    $test_name = substr($file, 0, strlen($file) - 4);
+    $test_name = substr($filePath, 0, strlen($filePath) - 4);
     test_setup($test_name);
     test_exercise_verify($test_name, $test_num);
     test_teardown($test_name);
@@ -638,7 +645,7 @@ function recursive_tests() {
   // Loop through files
   foreach(new RecursiveIteratorIterator($it) as $file) {
     // skip the hidden files or files that are not .src
-    if ((preg_match("/^\./", $it) == 1) || ($file->getExtension() != 'src')) {
+    if ((preg_match("/^\./", $it) == 1) || (preg_match("/\/[^\/\.]*\.src$/", $file) != 1)) {
       continue;
     }
     $test_num++;
